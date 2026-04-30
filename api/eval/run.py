@@ -26,7 +26,10 @@ JUDGE_MODEL = os.environ.get("OPENROUTER_FALLBACK_MODEL", "openai/gpt-4o-mini")
 
 # ---------- Graders ----------
 
-def grade_exact_number(answer: str, expected: float, tolerance_pct: float = 1.0) -> tuple[bool, str]:
+
+def grade_exact_number(
+    answer: str, expected: float, tolerance_pct: float = 1.0
+) -> tuple[bool, str]:
     nums = re.findall(r"[\d,]+(?:\.\d+)?", answer.replace(",", ""))
     for raw in nums:
         try:
@@ -46,7 +49,9 @@ def grade_contains(answer: str, expected: list[str]) -> tuple[bool, str]:
     return True, f"all expected strings found"
 
 
-def grade_set_overlap(answer: str, expected: list[str], min_overlap: int) -> tuple[bool, str]:
+def grade_set_overlap(
+    answer: str, expected: list[str], min_overlap: int
+) -> tuple[bool, str]:
     lower = answer.lower()
     found = [e for e in expected if e.lower() in lower]
     ok = len(found) >= min_overlap
@@ -101,7 +106,9 @@ def print_steps(steps: list) -> None:
 def grade(case: dict[str, Any], answer: str) -> tuple[bool, str]:
     gt = case["grading"]
     if gt == "exact_number":
-        return grade_exact_number(answer, float(case["expected"]), float(case.get("tolerance_pct", 1.0)))
+        return grade_exact_number(
+            answer, float(case["expected"]), float(case.get("tolerance_pct", 1.0))
+        )
     elif gt == "contains":
         return grade_contains(answer, case["expected"])
     elif gt == "set_overlap":
@@ -114,6 +121,7 @@ def grade(case: dict[str, Any], answer: str) -> tuple[bool, str]:
 
 # ---------- Main ----------
 
+
 def run_eval(quick: bool = False):
     db.pool.open()
     source = QUICK_FILE if quick else GOLDEN_FILE
@@ -123,7 +131,7 @@ def run_eval(quick: bool = False):
     passed = 0
 
     print(f"\n{'='*60}")
-    print(f"  Synthio {label}")
+    print(f"  Gazyva {label}")
     print(f"{'='*60}\n")
 
     for i, case in enumerate(cases, 1):
@@ -148,15 +156,20 @@ def run_eval(quick: bool = False):
         print(f"  {status}  ({elapsed}s)  {detail}")
         print(f"  A: {answer[:200].strip()}{'…' if len(answer) > 200 else ''}\n")
 
-        results.append({
-            "id": qid,
-            "question": question,
-            "answer": answer,
-            "passed": ok,
-            "detail": detail,
-            "elapsed": elapsed,
-            "steps": [(getattr(a, "tool", "?"), getattr(a, "tool_input", ""), str(o)) for a, o in steps],
-        })
+        results.append(
+            {
+                "id": qid,
+                "question": question,
+                "answer": answer,
+                "passed": ok,
+                "detail": detail,
+                "elapsed": elapsed,
+                "steps": [
+                    (getattr(a, "tool", "?"), getattr(a, "tool_input", ""), str(o))
+                    for a, o in steps
+                ],
+            }
+        )
 
     total = len(cases)
     score = f"{passed}/{total}"
@@ -166,7 +179,7 @@ def run_eval(quick: bool = False):
 
     # Write markdown report
     lines = [
-        f"# Synthio Eval Report",
+        f"# Gazyva Eval Report",
         f"",
         f"**Score: {score}** ({round(passed/total*100)}%)",
         f"",
