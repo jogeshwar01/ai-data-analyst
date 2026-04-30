@@ -31,6 +31,7 @@ def _build_llm(model: str) -> ChatOpenAI:
 
 # ---------- Tools ----------
 
+
 @tool
 def list_schema(table: str | None = None) -> str:
     """List columns + 3 sample rows for a table. If table is None, list all table names with row counts."""
@@ -69,14 +70,26 @@ def list_schema(table: str | None = None) -> str:
 
 @tool
 def run_sql(query: str) -> str:
-    """Execute a read-only SQL query against the Postgres database. Returns up to 50 rows as JSON. On error, returns the Postgres error verbatim — fix and retry."""
+    """Execute a read-only SQL query against the Postgres database. Returns up to 50 rows as JSON. On error, returns the Postgres error verbatim - fix and retry."""
     q = query.strip().rstrip(";")
     lowered = q.lower()
-    forbidden = ("insert ", "update ", "delete ", "drop ", "alter ", "truncate ", "create ", "grant ", "revoke ")
+    forbidden = (
+        "insert ",
+        "update ",
+        "delete ",
+        "drop ",
+        "alter ",
+        "truncate ",
+        "create ",
+        "grant ",
+        "revoke ",
+    )
     if any(tok in lowered for tok in forbidden):
         return "ERROR: write/DDL statements are not allowed. Use SELECT only."
     try:
-        cols, rows = db.query(f"SELECT * FROM ({q}) _wrapped LIMIT {MAX_ROWS_RETURNED + 1}")
+        cols, rows = db.query(
+            f"SELECT * FROM ({q}) _wrapped LIMIT {MAX_ROWS_RETURNED + 1}"
+        )
     except Exception as e:
         return f"ERROR: {e}"
     truncated = len(rows) > MAX_ROWS_RETURNED
@@ -92,21 +105,24 @@ def run_sql(query: str) -> str:
 
 @tool
 def run_python(code: str) -> str:
-    """Run Python (pandas/numpy pre-imported, plus a `query(sql)` helper that returns a DataFrame). 10s timeout. Use ONLY for simulation or multi-step computation that SQL can't express. Print results — anything not printed is lost."""
+    """Run Python (pandas/numpy pre-imported, plus a `query(sql)` helper that returns a DataFrame). 10s timeout. Use ONLY for simulation or multi-step computation that SQL can't express. Print results - anything not printed is lost."""
     from .tools import run_python_sandbox
+
     return run_python_sandbox(code)
 
 
 @tool
 def make_chart(data_json: str, vega_lite_spec: str) -> str:
-    """Render a Vega-Lite chart for the user. data_json is a JSON array of records; vega_lite_spec is a JSON string of the Vega-Lite spec (without the `data` field — it will be injected). Returns a confirmation; the chart is shown to the user automatically."""
+    """Render a Vega-Lite chart for the user. data_json is a JSON array of records; vega_lite_spec is a JSON string of the Vega-Lite spec (without the `data` field - it will be injected). Returns a confirmation; the chart is shown to the user automatically."""
     from .tools import build_chart
+
     return build_chart(data_json, vega_lite_spec)
 
 
 def _jsonable(v: Any) -> Any:
     from datetime import date, datetime
     from decimal import Decimal
+
     if isinstance(v, (datetime, date)):
         return v.isoformat()
     if isinstance(v, Decimal):
@@ -118,12 +134,14 @@ def _jsonable(v: Any) -> Any:
 
 TOOLS = [list_schema, run_sql, run_python, make_chart]
 
-PROMPT_TEMPLATE = ChatPromptTemplate.from_messages([
-    ("system", prompts.ASSISTANT_PROMPT),
-    MessagesPlaceholder("chat_history", optional=True),
-    ("human", "{input}"),
-    MessagesPlaceholder("agent_scratchpad"),
-])
+PROMPT_TEMPLATE = ChatPromptTemplate.from_messages(
+    [
+        ("system", prompts.ASSISTANT_PROMPT),
+        MessagesPlaceholder("chat_history", optional=True),
+        ("human", "{input}"),
+        MessagesPlaceholder("agent_scratchpad"),
+    ]
+)
 
 
 def build_executor() -> AgentExecutor:

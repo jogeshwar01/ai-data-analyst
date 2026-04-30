@@ -126,7 +126,7 @@ def run_eval(quick: bool = False):
     db.pool.open()
     source = QUICK_FILE if quick else GOLDEN_FILE
     cases = json.loads(source.read_text())
-    label = "Quick Eval (5 Qs)" if quick else f"Golden Eval — {len(cases)} questions"
+    label = "Quick Eval (5 Qs)" if quick else f"Golden Eval - {len(cases)} questions"
     results = []
     passed = 0
 

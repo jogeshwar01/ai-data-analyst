@@ -26,7 +26,7 @@ pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=8, open=False)
 
 
 def bootstrap(force: bool = False) -> None:
-    """Create schema + load CSVs. Idempotent — skips load if fact_rx already populated."""
+    """Create schema + load CSVs. Idempotent - skips load if fact_rx already populated."""
     pool.open()
     with pool.connection() as conn, conn.cursor() as cur:
         cur.execute(SCHEMA_FILE.read_text())

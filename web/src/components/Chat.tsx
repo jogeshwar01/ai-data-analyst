@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, ChevronDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Chart } from "./Chart";
@@ -304,9 +304,10 @@ function ToolCallView({ tc }: { tc: ToolCall }) {
 				<span className="font-mono text-zinc-300 shrink-0">
 					{tc.name}
 				</span>
-				<span className="text-zinc-500 truncate">{preview}</span>
+				<span className="text-zinc-500 truncate flex-1">{preview}</span>
+				<ChevronDown className={cn("w-3 h-3 text-zinc-500 shrink-0 transition-transform duration-200", open && "rotate-180")} />
 			</button>
-			{open && (
+			<div className={cn("overflow-hidden transition-all duration-200 ease-in-out", open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0")}>
 				<div className="px-3 py-3 border-t border-zinc-800 space-y-3">
 					{sql && <CodeBlock label="sql" content={sql.trim()} />}
 					{code && <CodeBlock label="python" content={code.trim()} />}
@@ -325,7 +326,6 @@ function ToolCallView({ tc }: { tc: ToolCall }) {
 								content={JSON.stringify(inputObj, null, 2)}
 							/>
 						)}
-
 					{tc.output && (
 						<div>
 							<div className="text-zinc-500 mb-1 uppercase tracking-wide text-[10px]">
@@ -355,7 +355,7 @@ function ToolCallView({ tc }: { tc: ToolCall }) {
 						</div>
 					)}
 				</div>
-			)}
+			</div>
 		</div>
 	);
 }

@@ -1,119 +1,141 @@
-#  GAZYVA Commercial Analytics
+# AI Analyst for Your Data
 
-Natural language analytics over a pharma commercial dataset. Ask anything — the agent writes SQL or Python, runs it against Postgres, and explains the result with transparent tool traces.
+Ask questions in plain English from CSV data (about GAZYVA sales data). The agent figures out the SQL, runs it, and explains what it found, showing you exactly what it did along the way.
 
 ## Architecture
 
 ```
-React (Vite) ──SSE──► FastAPI ──► LangChain Agent
-                                      │
-                          ┌───────────┼───────────┐
-                          ▼           ▼           ▼
-                       Postgres    run_python   OpenRouter
-                       (CSV data   (pandas /    Kimi K2.6
-                        loaded at  numpy        primary,
-                        startup)   sandbox)     GPT-4o-mini
-                          │                    fallback
-                       Redis
-                      (insight
-                        cache)
+React -> FastAPI -> LangChain Agent -> OpenRouter (Kimi K2.6)
+                         |
+                  +------+------+
+                  |             |
+               Postgres       Redis
 ```
 
-**Stack:** FastAPI · Postgres 16 · Redis 7 · LangChain · React 18 · Tailwind · shadcn/ui · Docker Compose · OpenRouter
+The frontend sends your question to a FastAPI backend over SSE. A LangChain agent picks the right tool (SQL query, Python computation, or chart), runs it against Postgres, and streams the answer back token by token. Tool calls are shown inline so you can see the exact SQL that ran.
+
+The stack: React + Vite on the frontend, FastAPI + LangChain on the backend, Postgres for the data, Redis to cache the insight cards, OpenRouter for the LLM (Kimi K2.6, with GPT-4o-mini as fallback).
+
+## Agent
+
+The agent is built with LangChain's tool-calling interface. It gets the full schema in its system prompt and chooses tools based on the question. Primary model is `moonshotai/kimi-k2.6` via OpenRouter, with `openai/gpt-4o-mini` as automatic fallback.
+
+| Tool          | What it does                                                                                                                                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run_sql`     | Executes a read-only SELECT against Postgres, returns up to 50 rows. On error, returns the raw Postgres message so the agent can self-correct and retry.                                |
+| `list_schema` | Returns column names and sample rows for any table or view. Called when the agent needs to verify a column before writing a query.                                                      |
+| `run_python`  | Runs Python in a sandboxed subprocess (10s timeout). pandas and numpy are pre-imported plus a `query()` helper returning a DataFrame. Used for what-if projections and multi-step math. |
+| `make_chart`  | Takes a data array and a Vega-Lite spec, embeds the data, and returns a chart the frontend renders inline.                                                                              |
+
+## Example Queries
+
+**Q1 - `run_sql`: Which rep has the highest call-to-Rx conversion rate?**
+
+![q1-1](docs/images/q1-1.png)
+![q1-2](docs/images/q1-2.png)
+
+**Q2 - `list_schema`: What data do we have on each account?**
+
+![q2-1](docs/images/q2-1.png)
+![q2-2](docs/images/q2-2.png)
+
+**Q3 - `run_python`: If rep 3 doubled their completed calls to tier-B HCPs, what would the projected TRx lift be?**
+
+![q3-1](docs/images/q3-1.png)
+![q3-2](docs/images/q3-2.png)
+![q3-3](docs/images/q3-3.png)
+
+**Q4 - `make_chart`: Show me monthly TRx per territory as a chart**
+
+![q4-1](docs/images/q4-1.png)
+![q4-2](docs/images/q4-2.png)
+![q4-3](docs/images/q4-3.png)
+![q4-4](docs/images/q4-4.png)
+![q4-5](docs/images/q4-5.png)
+![q4-6](docs/images/q4-6.png)
 
 ## Features
 
-### Ask Anything
-Natural language → SQL or Python → answer with full tool trace. The agent:
-- Writes and self-corrects SQL via `run_sql` (retries on Postgres errors)
-- Runs pandas/numpy via a sandboxed subprocess for simulation questions
-- Renders Vega-Lite charts inline via `make_chart`
-- States assumptions explicitly on ambiguous questions
+**Ask Anything** is the main tab. Type any question and get an answer backed by real data. The agent self-corrects if it writes bad SQL. For ambiguous questions it states its assumption before answering.
 
-### Proactive Insights
-Six pre-computed analyses load on startup (Redis-cached, 1hr TTL):
-- Biggest TRx decliners vs prior quarter
-- Reps with low call→Rx conversion
-- Accounts with >5pp payor mix shifts
-- Tier-A HCPs with no recent rep contact
-- Territory MoM TRx growth
-- Rx concentration by specialty
+**Insights** shows six pre-computed analyses that run on startup and cache for an hour. Things like biggest TRx decliners, reps with low conversion, tier-A doctors with no recent visits. Each card has a button to ask a follow-up in chat.
 
-Each card has a "dig deeper →" button that seeds the chat with the relevant question.
+**Rep Coach** lets you pick a rep and get three prioritized actions: which high-potential doctors they're under-visiting, how their conversion compares to peers, and which tier-A doctors have gone cold.
 
-### Rep Coach
-Pick any rep → get 3 prioritized next-best-actions backed by real data: under-covered high-potential HCPs, conversion rate vs peers, dormant Tier-A HCPs to re-engage.
+**Eval** is a set of golden Q&A pairs you can run to check the agent is working correctly.
 
-### Eval Harness
-11 golden Q&A pairs with automatic grading (exact match, set overlap, LLM-judge).
-
-## Quick Start
+## Setup
 
 ```bash
 cp .env.example .env
-# Add your OPENROUTER_API_KEY to .env
+# fill in OPENROUTER_API_KEY
 docker compose up --build
 ```
 
-- Frontend: http://localhost:5173
-- API: http://localhost:8000
-- API docs: http://localhost:8000/docs
+App runs at http://localhost:5173. API at http://localhost:8000.
 
-## Eval
+Data loads automatically on first startup from the CSVs in `data/`.
+
+## Running the eval
 
 ```bash
-# Fast — 5 core questions, ~2 min
+# quick check, 5 questions, about 2 minutes
 docker compose exec api python3 -m eval.run --quick
 
-# Full — 11 questions, ~8 min, writes api/eval/report.md
+# full suite, 11 questions, writes api/eval/report.md
 docker compose exec api python3 -m eval.run
 ```
 
-## Dataset
-
-10 CSVs in `data/` — pharma commercial star schema:
-
-| Table | Description |
-|---|---|
-| `fact_rx` | Daily Rx volume per HCP (TRx, NRx) |
-| `fact_rep_activity` | Sales rep calls and meetings |
-| `fact_payor_mix` | Monthly insurance mix by account |
-| `fact_ln_metrics` | Quarterly market share (HCP + account) |
-| `hcp_dim` | 90 HCPs with specialty + tier |
-| `account_dim` | 24 hospitals/clinics |
-| `rep_dim` | 9 sales reps |
-| `territory_dim` | 3 territories |
-| `date_dim` | 2024-08-01 → 2025-12-31 |
-
-## Project Structure
+## Project layout
 
 ```
 api/
-  main.py          FastAPI routes + SSE streaming + chat logger
-  insights.py      6 canned analyses (Redis-cached)
-  coach.py         Rep next-best-actions
+  main.py         routes, SSE streaming, chat logging
+  insights.py     the six canned analyses
+  coach.py        rep coaching logic
   agent/
-    core.py        LangChain agent + 4 tool definitions
-    prompts.py     System prompt + few-shot examples
-    tools.py       Python sandbox + Vega-Lite chart builder
+    core.py       agent setup and tool definitions
+    prompts.py    system prompt and few-shot examples
+    tools.py      python sandbox and chart builder
   db/
-    __init__.py    Postgres pool + CSV bootstrap
-    schema.sql     DDL + convenience views
+    __init__.py   connection pool and CSV bootstrap
+    schema.sql    table definitions and views
   eval/
-    golden.json    11 Q&A pairs (full)
-    quick.json     5 Q&A pairs (fast)
-    extended.json  6 harder Q&A pairs
-    run.py         Eval runner with step traces
+    run.py        eval runner
+    golden.json   11 test questions
+    quick.json    5 faster test questions
 
 web/src/
-  App.tsx          3-tab layout (Ask Anything · Insights · Rep Coach)
+  App.tsx
   components/
-    Chat.tsx       Streaming chat with tool traces
-    InsightCard.tsx Collapsible insight cards
-    RepCoach.tsx   Rep selector + action cards
-    Chart.tsx      Vega-Lite renderer
+    Chat.tsx
+    InsightCard.tsx
+    RepCoach.tsx
+    Chart.tsx
 ```
 
-## Security Note
+## Notes
 
-`run_python` uses subprocess isolation with a 10s timeout. Suitable for local demo use; production deployments should use a proper sandbox (E2B, Modal, or gVisor).
+Chat logs are saved to `api/logs.md` after each conversation. The agent is explained in detail in `assignment/agent.md`.
+
+## Production Improvements
+
+### Code Sandbox
+
+`run_python` currently uses a subprocess with a 10s timeout. That works for a local demo but is not safe for production - a malicious or buggy input could exhaust resources or escape the process. The right fix is a proper isolated execution environment like [E2B](https://e2b.dev), Modal, or gVisor. These give you network isolation, memory limits, and per-execution containers.
+
+### React Agent
+
+The current agent is a tool-calling agent - the model picks one tool per step and the loop runs linearly. A ReAct (Reason + Act) agent adds an explicit reasoning step before each action: the model writes out its thought, then acts. This tends to produce better results on multi-step questions because the model plans before calling tools. The tradeoff is more tokens per turn and slightly slower responses. LangChain supports this via `create_react_agent` and it would be a one-file change in `agent/core.py`.
+
+### Multiple LLM Providers
+
+Right now we have one primary (Kimi K2.6) and one fallback (GPT-4o-mini), both via OpenRouter. For production you'd want a more robust routing layer - retrying across multiple providers, falling back based on latency not just errors, and tracking per-provider success rates. OpenRouter itself handles some of this, but libraries like LiteLLM give you finer control and a unified interface across Anthropic, OpenAI, Google, and others.
+
+### Vector DB for Schema Routing
+
+A vector DB would not help much here because the full schema fits in the system prompt (~300 tokens). Where it would matter is if the dataset grew to hundreds of tables - at that point you'd want semantic search to retrieve only the relevant tables and columns for a given question rather than dumping everything. Tools like pgvector (runs inside Postgres itself) or Qdrant would handle this. For this dataset size, it would be over-engineering.
+
+### Conversation Memory
+
+Each chat request is stateless today. Adding short-term memory (the last N turns injected as `chat_history`) would let users ask follow-up questions like "now filter that by territory 2" without restating the full context. LangChain's `MessagesPlaceholder("chat_history")` is already wired into the prompt template - it just needs a session store (Redis is already in the stack) to persist turns across requests.

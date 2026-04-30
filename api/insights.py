@@ -23,9 +23,12 @@ def _redis_client() -> _redis.Redis:
 
 # ---------- Canned analyses ----------
 
+
 def _q(sql: str) -> list[dict]:
     cols, rows = db.query(sql)
-    return [dict(zip(cols, [str(v) if v is not None else None for v in r])) for r in rows]
+    return [
+        dict(zip(cols, [str(v) if v is not None else None for v in r])) for r in rows
+    ]
 
 
 ANALYSES: list[dict[str, Any]] = [
@@ -51,7 +54,7 @@ ANALYSES: list[dict[str, Any]] = [
             WHERE COALESCE(prev,0) > 0
             ORDER BY delta ASC LIMIT 5
         """,
-        "narrative_template": "HCPs with the steepest TRx decline vs prior quarter. {top} dropped by {delta} scripts — worth prioritizing for rep engagement.",
+        "narrative_template": "HCPs with the steepest TRx decline vs prior quarter. {top} dropped by {delta} scripts - worth prioritizing for rep engagement.",
     },
     {
         "id": "low_conversion_reps",
@@ -75,7 +78,7 @@ ANALYSES: list[dict[str, Any]] = [
             FROM calls c LEFT JOIN rx ON c.rep_id = rx.rep_id
             ORDER BY trx_per_call ASC LIMIT 5
         """,
-        "narrative_template": "Reps with the lowest TRx per completed call. {top} averages only {val} scripts per call — coaching opportunity.",
+        "narrative_template": "Reps with the lowest TRx per completed call. {top} averages only {val} scripts per call - coaching opportunity.",
     },
     {
         "id": "payor_mix_shifts",
@@ -99,11 +102,11 @@ ANALYSES: list[dict[str, Any]] = [
                    ROUND(prev_pct,1) AS prev_pct, ROUND(shift_pp,1) AS shift_pp
             FROM shifts ORDER BY shift_pp DESC LIMIT 6
         """,
-        "narrative_template": "{n} account-payor combinations shifted >5pp MoM. {top} saw the largest swing — check formulary access.",
+        "narrative_template": "{n} account-payor combinations shifted >5pp MoM. {top} saw the largest swing - check formulary access.",
     },
     {
         "id": "uncalled_tier_a",
-        "title": "Tier-A HCPs — No Recent Call",
+        "title": "Tier-A HCPs - No Recent Call",
         "subtitle": "High-value doctors with zero rep contact in 60 days",
         "icon": "AlertCircle",
         "sql": """
@@ -182,11 +185,24 @@ def _narrative(analysis: dict, rows: list[dict]) -> str:
     if not rows:
         return "No data returned for this analysis."
     first = rows[0]
-    top = first.get("hcp_name") or first.get("rep_name") or first.get("account_name") or first.get("territory_name") or first.get("specialty") or "—"
-    val = first.get("trx_per_call") or first.get("delta") or first.get("shift_pp") or first.get("pct_of_total") or "—"
+    top = (
+        first.get("hcp_name")
+        or first.get("rep_name")
+        or first.get("account_name")
+        or first.get("territory_name")
+        or first.get("specialty")
+        or "-"
+    )
+    val = (
+        first.get("trx_per_call")
+        or first.get("delta")
+        or first.get("shift_pp")
+        or first.get("pct_of_total")
+        or "-"
+    )
     n = str(len(rows))
-    pct = first.get("pct_of_total", "—")
-    delta = first.get("delta", "—")
+    pct = first.get("pct_of_total", "-")
+    delta = first.get("delta", "-")
     return tpl.format(top=top, val=val, n=n, pct=pct, delta=delta)
 
 
@@ -203,25 +219,29 @@ def get_insights(force: bool = False) -> list[dict]:
         try:
             rows = _q(a["sql"])
             narrative = _narrative(a, rows)
-            results.append({
-                "id": a["id"],
-                "title": a["title"],
-                "subtitle": a["subtitle"],
-                "icon": a["icon"],
-                "rows": rows,
-                "narrative": narrative,
-                "dig_deeper_prompt": a["title"] + " — " + a["subtitle"],
-            })
+            results.append(
+                {
+                    "id": a["id"],
+                    "title": a["title"],
+                    "subtitle": a["subtitle"],
+                    "icon": a["icon"],
+                    "rows": rows,
+                    "narrative": narrative,
+                    "dig_deeper_prompt": a["title"] + " - " + a["subtitle"],
+                }
+            )
         except Exception as e:
-            results.append({
-                "id": a["id"],
-                "title": a["title"],
-                "subtitle": a["subtitle"],
-                "icon": a["icon"],
-                "rows": [],
-                "narrative": f"Error: {e}",
-                "dig_deeper_prompt": a["title"],
-            })
+            results.append(
+                {
+                    "id": a["id"],
+                    "title": a["title"],
+                    "subtitle": a["subtitle"],
+                    "icon": a["icon"],
+                    "rows": [],
+                    "narrative": f"Error: {e}",
+                    "dig_deeper_prompt": a["title"],
+                }
+            )
 
     r.setex(cache_key, CACHE_TTL, json.dumps(results, default=str))
     return results

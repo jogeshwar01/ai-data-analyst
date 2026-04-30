@@ -27,11 +27,11 @@
 
 **Answer:** The top 5 HCPs by total TRx in the last 90 days (from the latest Rx date in the dataset) are:
 
-1. **Dr Sage Jackson** — Internal Medicine, Tier B — 86 TRx
-2. **Dr Blake Garcia** — Rheumatology, Tier C — 84 TRx
-3. **Dr Cameron Clark** — Rheumatology, Tier C — 83 TRx
-4. **Dr Phoenix Lee** — Rheumatology, Tier B — 79 TRx
-5. **Dr Hayden Jackson** — Internal Medicine, Tier A — 77 TRx
+1. **Dr Sage Jackson** - Internal Medicine, Tier B - 86 TRx
+2. **Dr Blake Garcia** - Rheumatology, Tier C - 84 TRx
+3. **Dr Cameron Clark** - Rheumatology, Tier C - 83 TRx
+4. **Dr Phoenix Lee** - Rheumatology, Tier B - 79 TRx
+5. **Dr Hayden Jackson** - Internal Medicine, Tier A - 77 TRx
 
 Notably, two tier-C rheumatologists (Drs. Garcia and Clark) rank second and third, outperforming several tier-A and …
 
@@ -108,12 +108,12 @@ Notably, two tier-C rheumatologists (Drs. Garcia and Clark) rank second and thir
 
 Here are the top 10 doctors:
 
-1. **Dr Sage Jackson** (Internal Medicine, tier B) — 86 TRx
-2. **Dr Phoenix Lee** (Rheumatology, tier B) — 79 TRx
-3. **Dr Hayden Jackson** (Internal Medicine, tier A) — 77 TRx
-4. **Dr Taylor Gonzalez** (Rheumatology, tier A) — 75 TRx
-5. **Dr Sydney Anderson** (Nephrology, tier A) — 72 TRx
-6. **Dr Quinn Johnson** (Internal Medicine, tier B) — 71 TRx
+1. **Dr Sage Jackson** (Internal Medicine, tier B) - 86 TRx
+2. **Dr Phoenix Lee** (Rheumatology, tier B) - 79 TRx
+3. **Dr Hayden Jackson** (Internal Medicine, tier A) - 77 TRx
+4. **Dr Taylor Gonzalez** (Rheumatology, tier A) - 75 TRx
+5. **Dr Sydney Anderson** (Nephrology, tier A) - 72 TRx
+6. **Dr Quinn Johnson** (Internal Medicine, tier B) - 71 TRx
 7. \*…
 
 ### ✓ Q11_what_if
@@ -160,6 +160,6 @@ _Assumption:_ The marginal TRx yield for these additional calls matches the hist
 
 **Answer:** Here are the key anomalies and unusual patterns found across the dataset:
 
-1. **HCP TRx Outliers** — Six doctors sit >2 standard deviations above the mean TRx volume (290 ± 31). Dr Blake Garcia (374 TRx, tier C), Dr Phoenix Lee (363, tier B), and Dr Quinn Johnson (360, tier B) are the top outliers. Notably, Dr Jordan Clark is the only tier-A outlier but at a much lower 225 TRx, suggesting tier A does not guarantee highest volume here.
+1. **HCP TRx Outliers** - Six doctors sit >2 standard deviations above the mean TRx volume (290 ± 31). Dr Blake Garcia (374 TRx, tier C), Dr Phoenix Lee (363, tier B), and Dr Quinn Johnson (360, tier B) are the top outliers. Notably, Dr Jordan Clark is the only tier-A outlier but at a much lower 225 TRx, suggesting tier A does not guarantee highest volume here.
 
-2. **NRx/TRx Ratio** — Surprisingly clean: no HCPs have zer…
+2. **NRx/TRx Ratio** - Surprisingly clean: no HCPs have zer…

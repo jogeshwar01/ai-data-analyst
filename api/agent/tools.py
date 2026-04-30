@@ -1,10 +1,9 @@
-"""Python sandbox + Vega-Lite chart builder — used by agent tools."""
+"""Python sandbox + Vega-Lite chart builder - used by agent tools."""
 
 import json
 import os
 import subprocess
 import textwrap
-
 
 # ---------- Python sandbox ----------
 
@@ -40,7 +39,7 @@ def run_python_sandbox(code: str) -> str:
             return f"ERROR:\n{result.stderr[:3000]}"
         out = result.stdout.strip()
         if not out:
-            return "(no output printed — remember to print() your results)"
+            return "(no output printed - remember to print() your results)"
         return out[:6000]
     except subprocess.TimeoutExpired:
         return "ERROR: execution timed out (10s limit)"
@@ -50,13 +49,18 @@ def run_python_sandbox(code: str) -> str:
 
 # ---------- Chart builder ----------
 
+
 def build_chart(data_json: str, vega_lite_spec: str) -> str:
     """Validate spec + embed data. Returns a JSON envelope the frontend detects."""
     try:
         data = json.loads(data_json) if isinstance(data_json, str) else data_json
-        spec = json.loads(vega_lite_spec) if isinstance(vega_lite_spec, str) else vega_lite_spec
+        spec = (
+            json.loads(vega_lite_spec)
+            if isinstance(vega_lite_spec, str)
+            else vega_lite_spec
+        )
     except json.JSONDecodeError as e:
-        return f"ERROR: invalid JSON — {e}"
+        return f"ERROR: invalid JSON - {e}"
 
     if not isinstance(data, list):
         return "ERROR: data_json must be a JSON array of record objects"

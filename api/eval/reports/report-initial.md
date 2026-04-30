@@ -68,7 +68,7 @@ Notably, the list is split between Internal Medicine and Rheumatology, and inclu
 | Territory       | Notable swings                                                                                                       | Latest month (Dec 2025)                      |
 | --------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | **Territory 1** | Volatile; sharp drops in Feb 2025 (‑23%) and Nov 2025 (‑18%), strong rebounds in Dec 2024 (+22%) and Sep 2025 (+18%) | **+11%** (513 TRx)                           |
-| **Territory 2** | Most stable; steady climb through late 2025 with only mild contractions                                              | **+10%** (593 TRx) — highest absolute volume |
+| **Territory 2** | Most stable; steady climb through late 2025 with only mild contractions                                              | **+10%** (593 TRx) - highest absolute volume |
 
 | **Territory 3**
 **Grade:** all expected strings found
