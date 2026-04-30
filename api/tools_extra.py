@@ -14,13 +14,6 @@ _PREAMBLE = textwrap.dedent("""\
     import pandas as pd
     import numpy as np
 
-    try:
-        from scipy import stats
-        import statsmodels.formula.api as smf
-        import statsmodels.api as sm
-        from sklearn.linear_model import LinearRegression
-    except ImportError:
-        pass
 
     def query(sql: str) -> pd.DataFrame:
         \"\"\"Run read-only SQL against the database, return a DataFrame.\"\"\"

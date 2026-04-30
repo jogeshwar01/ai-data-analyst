@@ -10,9 +10,6 @@ dependencies = [
     "langchain>=0.3.10",
     "langchain-openai>=0.2.11",
     "pydantic>=2.10",
-    "pyyaml>=6.0",
     "pandas>=2.2",
     "numpy>=2.1",
-    "statsmodels>=0.14",
-    "scikit-learn>=1.5",
 ]

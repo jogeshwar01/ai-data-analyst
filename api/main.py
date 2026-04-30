@@ -105,6 +105,18 @@ async def get_coach(rep_id: int):
     return result
 
 
+@app.post("/eval")
+async def run_eval_endpoint():
+    """Run the golden eval set. Returns pass/fail per question."""
+    import asyncio
+    from eval.run import run_eval
+    loop = asyncio.get_event_loop()
+    passed, total = await loop.run_in_executor(None, run_eval)
+    from eval.run import REPORT_FILE
+    report = REPORT_FILE.read_text() if REPORT_FILE.exists() else ""
+    return {"passed": passed, "total": total, "score": f"{passed}/{total}", "report_md": report}
+
+
 @app.get("/health")
 async def health():
     cols, rows = db.query("SELECT COUNT(*) FROM fact_rx")

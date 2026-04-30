@@ -1,0 +1,84 @@
+[
+  {
+    "id": "Q1_hcp_count",
+    "question": "How many distinct HCPs prescribed GAZYVA?",
+    "grading": "exact_number",
+    "expected": 90
+  },
+  {
+    "id": "Q2_q4_2024_trx",
+    "question": "What is the total TRx for Q4 2024?",
+    "grading": "exact_number",
+    "expected": 4563,
+    "tolerance_pct": 1
+  },
+  {
+    "id": "Q3_top5_hcps",
+    "question": "Who are the top 5 HCPs by total TRx in the last 90 days?",
+    "grading": "set_overlap",
+    "expected": [
+      "Dr Sage Jackson",
+      "Dr Blake Garcia",
+      "Dr Cameron Clark",
+      "Dr Phoenix Lee",
+      "Dr Hayden Jackson"
+    ],
+    "min_overlap": 4
+  },
+  {
+    "id": "Q4_best_territory",
+    "question": "Which territory has the highest TRx per HCP?",
+    "grading": "contains",
+    "expected": ["Territory 3"]
+  },
+  {
+    "id": "Q5_mom_growth",
+    "question": "Show month-over-month TRx growth per territory.",
+    "grading": "contains",
+    "expected": ["Territory 1", "Territory 2", "Territory 3"]
+  },
+  {
+    "id": "Q7_uncalled_tier_a",
+    "question": "Which tier-A HCPs have had zero completed rep calls in the last 60 days?",
+    "grading": "set_overlap",
+    "expected": [
+      "Dr Rowan Davis",
+      "Dr Drew Lee",
+      "Dr Rowan Martinez",
+      "Dr Drew Wilson",
+      "Dr Taylor Smith"
+    ],
+    "min_overlap": 3
+  },
+  {
+    "id": "Q8_best_rep",
+    "question": "Which rep has the highest call-to-Rx conversion rate?",
+    "grading": "contains",
+    "expected": ["River Miller"]
+  },
+  {
+    "id": "Q9_medicare_shifts",
+    "question": "Which accounts have shifted more than 5 percentage points in Medicare payor mix quarter-over-quarter?",
+    "grading": "set_overlap",
+    "expected": ["Bay Clinic", "Bay Hospital", "Valley Hospital"],
+    "min_overlap": 2
+  },
+  {
+    "id": "Q10_ambiguity",
+    "question": "Which doctors are best?",
+    "grading": "llm_judge",
+    "rubric": "The answer must either (a) ask a clarifying question about what 'best' means, OR (b) explicitly state an assumption before answering (e.g. 'interpreting best as highest TRx'). PASS if the assumption is clearly stated or a clarifying question is asked. FAIL if the agent answers without any assumption or clarification."
+  },
+  {
+    "id": "Q11_what_if",
+    "question": "If rep 3 doubled their completed calls to tier-B HCPs in their territory, what would the projected TRx lift be?",
+    "grading": "llm_judge",
+    "rubric": "The answer should produce a projected TRx number or percentage lift. It should acknowledge uncertainty (mention confidence interval, caveat, or approximation). PASS if a numeric projection is provided with some uncertainty qualifier. FAIL if no number is given or no uncertainty is mentioned."
+  },
+  {
+    "id": "Q12_anomalies",
+    "question": "Show me anomalies or unusual patterns in the dataset.",
+    "grading": "llm_judge",
+    "rubric": "The answer should identify at least 2 specific, concrete anomalies with actual names/numbers from the data (e.g. specific HCPs, accounts, or rep names with values). Generic statements like 'there may be outliers' without specifics do not count. PASS if 2+ specific data-backed findings are reported. FAIL otherwise."
+  }
+]

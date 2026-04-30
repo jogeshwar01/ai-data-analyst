@@ -15,11 +15,8 @@ RUN pip install --no-cache-dir \
     langchain==0.3.10 \
     langchain-openai==0.2.11 \
     pydantic==2.10.3 \
-    pyyaml==6.0.2 \
     pandas==2.2.3 \
-    numpy==2.1.3 \
-    statsmodels==0.14.4 \
-    scikit-learn==1.5.2
+    numpy==2.1.3
 
 COPY . .
 

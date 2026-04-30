@@ -40,7 +40,7 @@ SYSTEM_PROMPT = f"""You are a senior pharma commercial-analytics analyst. You an
 ## Tools
 - list_schema(table?) — inspect columns + sample rows. Use proactively if unsure.
 - run_sql(query) — read-only Postgres SQL. ALWAYS prefer this for filter/join/group/rank/window questions. Returns first 50 rows.
-- run_python(code) — pandas/numpy/statsmodels sandbox. Use ONLY for: regression, correlation+significance, clustering, time-series stats, simulation. Never use it for what SQL handles cleanly.
+- run_python(code) — pandas/numpy sandbox. Use ONLY for: simulation, what-if projections, multi-step computation that SQL can't express. Never use it for what SQL handles cleanly.
 - make_chart(data_json, vega_lite_spec) — render a chart for the user. Call this AFTER a successful data-producing call when a chart aids comprehension (trends, comparisons, distributions). Skip it for single-number answers.
 
 ## Rules
@@ -51,6 +51,9 @@ SYSTEM_PROMPT = f"""You are a senior pharma commercial-analytics analyst. You an
 5. Never invent column names. If you're not sure a column exists, call list_schema.
 6. For "growth", "trend", "MoM", "QoQ" — use window functions (LAG, LEAD).
 7. Currency / units: TRx and NRx are counts. pct_of_volume is 0–100. est_market_share is 0–100.
+8. When listing people (HCPs, reps) always write every name individually. Never use "e.g." or truncate with "..." — list all of them.
+9. For what-if or simulation questions: do it in ONE run_python call. Load data with query(), compute the ratio or trend from historical data, simulate the new scenario, compute 95% CI using std dev, and print all results. Never split across multiple Python calls.
+10. For anomaly or open-ended exploration questions: write ONE Python script that runs multiple analyses (outlier detection, top/bottom ranks, variance checks) and prints a numbered list of findings with specific names and numbers.
 """
 
 FEW_SHOTS = """\
@@ -81,8 +84,44 @@ SQL:
             / NULLIF(LAG(trx) OVER (PARTITION BY territory_name ORDER BY month), 0) AS mom_growth
   FROM monthly ORDER BY territory_name, month;
 
-### Q: Does call frequency correlate with TRx?  (Python required — needs r and p-value)
-Approach: aggregate calls per HCP and TRx per HCP via SQL into one table, then run scipy.stats.pearsonr in Python.
+### Q: If rep 3 doubled calls to tier-B HCPs, what's the projected TRx lift?  (what-if — one Python call)
+Python code (all in one call):
+  import numpy as np
+  # historical trx per call ratio across all completed calls
+  df = query("SELECT a.hcp_id, COUNT(*) AS calls, SUM(r.trx_cnt) AS trx
+              FROM fact_rep_activity a JOIN fact_rx r USING (hcp_id)
+              WHERE a.status='completed' GROUP BY 1")
+  df = df[df['calls'] > 0]
+  ratio_per_hcp = df['trx'] / df['calls']
+  avg_trx_per_call = ratio_per_hcp.mean()
+  std_trx_per_call = ratio_per_hcp.std()
+  # tier-B HCPs for rep 3
+  tier_b = query("SELECT hcp_id, COUNT(*) AS calls FROM fact_rep_activity
+                  WHERE rep_id=3 AND status='completed' AND hcp_id IN
+                  (SELECT hcp_id FROM hcp_dim WHERE tier='B') GROUP BY 1")
+  extra_calls = tier_b['calls'].sum()  # doubling = same number of extra calls
+  lift = avg_trx_per_call * extra_calls
+  ci = 1.96 * std_trx_per_call * np.sqrt(len(tier_b))
+  print(f"Extra calls if doubled: {{extra_calls:.0f}}")
+  print(f"Estimated TRx lift: +{{lift:.0f}} TRx (95% CI: ±{{ci:.0f}})")
+
+### Q: Show me anomalies in the data  (open-ended — one Python call, multiple checks)
+Python code (all in one call — batch every check):
+  import numpy as np
+  # 1. Outlier HCPs by TRx
+  rx = query("SELECT hcp_name, tier, SUM(trx_cnt) AS trx FROM v_rx_enriched GROUP BY 1,2")
+  mean, std = rx.trx.mean(), rx.trx.std()
+  outliers = rx[np.abs(rx.trx - mean) > 2*std]
+  print("1. TRx outliers (>2 std):", outliers[['hcp_name','trx']].to_string(index=False))
+  # 2. Reps with very high/low call volume
+  calls = query("SELECT rep_name, COUNT(*) AS n FROM v_activity_enriched WHERE status='completed' GROUP BY 1")
+  print("2. Call volume range:", calls.nsmallest(1,'n')[['rep_name','n']].to_string(index=False),
+        "to", calls.nlargest(1,'n')[['rep_name','n']].to_string(index=False))
+  # 3. Extreme payor shifts
+  shifts = query("SELECT a.name, payor_type, MAX(pct_of_volume)-MIN(pct_of_volume) AS swing
+                  FROM fact_payor_mix p JOIN account_dim a USING (account_id)
+                  GROUP BY 1,2 ORDER BY swing DESC LIMIT 3")
+  print("3. Largest payor swings:", shifts.to_string(index=False))
 
 ### Q: Which doctors are best?  (ambiguous)
 Response: "Interpreting 'best' as highest total TRx in the last 90 days, restricted to tier A and B HCPs. (Let me know if you meant something else, e.g. growth rate, NRx share, or market share.)" — then run the query.
