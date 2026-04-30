@@ -13,11 +13,18 @@ from pydantic import BaseModel
 
 import db
 from agent import get_executor
+import insights as insights_mod
+import coach as coach_mod
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.bootstrap(force=False)
+    # Pre-warm insight cache in the background so first /insights is instant.
+    try:
+        insights_mod.get_insights()
+    except Exception as e:
+        print(f"[insights] pre-warm failed: {e}")
     yield
 
 
@@ -78,6 +85,24 @@ async def chat(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(400, "Empty message")
     return StreamingResponse(_stream_chat(req.message), media_type="text/event-stream")
+
+
+@app.get("/insights")
+async def get_insights(force: bool = False):
+    return insights_mod.get_insights(force=force)
+
+
+@app.get("/coach/reps")
+async def list_reps():
+    return coach_mod.get_reps()
+
+
+@app.get("/coach/{rep_id}")
+async def get_coach(rep_id: int):
+    result = coach_mod.get_coaching(rep_id)
+    if "error" in result:
+        raise HTTPException(404, result["error"])
+    return result
 
 
 @app.get("/health")
