@@ -1,0 +1,40 @@
+[
+  {
+    "id": "Q1_hcp_count",
+    "question": "How many distinct HCPs prescribed GAZYVA?",
+    "grading": "exact_number",
+    "expected": 90
+  },
+  {
+    "id": "Q2_q4_2024_trx",
+    "question": "What is the total TRx for Q4 2024?",
+    "grading": "exact_number",
+    "expected": 4563,
+    "tolerance_pct": 1
+  },
+  {
+    "id": "Q4_best_territory",
+    "question": "Which territory has the highest TRx per HCP?",
+    "grading": "contains",
+    "expected": ["Territory 3"]
+  },
+  {
+    "id": "Q8_best_rep",
+    "question": "Which rep has the highest call-to-Rx conversion rate?",
+    "grading": "contains",
+    "expected": ["River Miller"]
+  },
+  {
+    "id": "Q7_uncalled_tier_a",
+    "question": "Which tier-A HCPs have had zero completed rep calls in the last 60 days?",
+    "grading": "set_overlap",
+    "expected": [
+      "Dr Rowan Davis",
+      "Dr Drew Lee",
+      "Dr Rowan Martinez",
+      "Dr Drew Wilson",
+      "Dr Taylor Smith"
+    ],
+    "min_overlap": 3
+  }
+]

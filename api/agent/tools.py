@@ -1,5 +1,4 @@
-"""run_python sandbox + make_chart — loaded lazily by agent.py."""
-from __future__ import annotations
+"""Python sandbox + Vega-Lite chart builder — used by agent tools."""
 
 import json
 import os
@@ -13,7 +12,6 @@ _PREAMBLE = textwrap.dedent("""\
     import os, sys
     import pandas as pd
     import numpy as np
-
 
     def query(sql: str) -> pd.DataFrame:
         \"\"\"Run read-only SQL against the database, return a DataFrame.\"\"\"

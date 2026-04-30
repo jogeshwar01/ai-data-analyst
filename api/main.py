@@ -1,10 +1,28 @@
 """FastAPI entrypoint."""
-from __future__ import annotations
 
 import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
+
+LOGS_FILE = Path(__file__).parent / "logs.md"
+
+
+def _append_chat_log(message: str, tools: list[dict], answer: str) -> None:
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines = [f"## {ts}", f"**Q:** {message}", ""]
+    if tools:
+        lines += ["**Trace:**", "```"]
+        for t in tools:
+            inp = json.dumps(t["input"], default=str) if not isinstance(t["input"], str) else t["input"]
+            lines.append(f"→ {t['name']}({inp[:120]})")
+            lines.append(f"← {t['output'][:200]}")
+        lines += ["```", ""]
+    lines += [f"**A:** {answer}", "", "---", ""]
+    with LOGS_FILE.open("a") as f:
+        f.write("\n".join(lines) + "\n")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,22 +70,24 @@ async def _stream_chat(message: str):
 
     executor = get_executor()
     answer_chunks: list[str] = []
+    tool_log: list[dict] = []
+    current_tool: dict | None = None
     try:
         async for event in executor.astream_events({"input": message}, version="v2"):
             kind = event["event"]
             if kind == "on_tool_start":
-                yield _sse("tool_start", {
-                    "name": event["name"],
-                    "input": event["data"].get("input", {}),
-                })
+                current_tool = {"name": event["name"], "input": event["data"].get("input", {}), "output": ""}
+                yield _sse("tool_start", {"name": current_tool["name"], "input": current_tool["input"]})
             elif kind == "on_tool_end":
                 output = event["data"].get("output")
                 if hasattr(output, "content"):
                     output = output.content
-                yield _sse("tool_end", {
-                    "name": event["name"],
-                    "output": str(output)[:8000],
-                })
+                out_str = str(output)[:8000]
+                if current_tool:
+                    current_tool["output"] = out_str
+                    tool_log.append(current_tool)
+                    current_tool = None
+                yield _sse("tool_end", {"name": event["name"], "output": out_str})
             elif kind == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
                 token = getattr(chunk, "content", "") or ""
@@ -75,7 +95,12 @@ async def _stream_chat(message: str):
                     answer_chunks.append(token)
                     yield _sse("token", {"text": token})
             await asyncio.sleep(0)
-        yield _sse("done", {"answer": "".join(answer_chunks).strip()})
+        answer = "".join(answer_chunks).strip()
+        yield _sse("done", {"answer": answer})
+        try:
+            _append_chat_log(message, tool_log, answer)
+        except Exception:
+            pass
     except Exception as e:
         yield _sse("error", {"message": str(e)})
 

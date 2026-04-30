@@ -1,5 +1,4 @@
 """Rep coaching logic — joins activity + Rx data to produce 3 next-best-actions."""
-from __future__ import annotations
 
 import db
 

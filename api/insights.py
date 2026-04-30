@@ -1,5 +1,4 @@
 """Six canned analyses that run at startup and are Redis-cached for 1 hour."""
-from __future__ import annotations
 
 import json
 import os

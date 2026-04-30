@@ -1,5 +1,4 @@
-"""Golden eval harness. Run with: python -m eval.run"""
-from __future__ import annotations
+"""Eval harness. Run with: python -m eval.run [--quick]"""
 
 import os
 import re
@@ -18,6 +17,7 @@ import db
 from agent import get_executor
 
 GOLDEN_FILE = Path(__file__).parent / "golden.json"
+QUICK_FILE = Path(__file__).parent / "quick.json"
 REPORT_FILE = Path(__file__).parent / "report.md"
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
@@ -75,12 +75,27 @@ def grade_llm_judge(answer: str, rubric: str) -> tuple[bool, str]:
     return passed, reason
 
 
-def run_agent(question: str) -> tuple[str, float]:
+def run_agent(question: str) -> tuple[str, float, list]:
     executor = get_executor()
     t0 = time.time()
     result = executor.invoke({"input": question})
     elapsed = round(time.time() - t0, 1)
-    return result.get("output", ""), elapsed
+    steps = result.get("intermediate_steps", [])
+    return result.get("output", ""), elapsed, steps
+
+
+def _preview(value: Any, limit: int = 200) -> str:
+    s = json.dumps(value, default=str) if not isinstance(value, str) else value
+    s = s.replace("\n", " ").strip()
+    return s[:limit] + "…" if len(s) > limit else s
+
+
+def print_steps(steps: list) -> None:
+    for action, output in steps:
+        tool_name = getattr(action, "tool", "?")
+        tool_input = getattr(action, "tool_input", "")
+        print(f"    → {tool_name}({_preview(tool_input, 120)})")
+        print(f"    ← {_preview(str(output), 160)}")
 
 
 def grade(case: dict[str, Any], answer: str) -> tuple[bool, str]:
@@ -99,14 +114,16 @@ def grade(case: dict[str, Any], answer: str) -> tuple[bool, str]:
 
 # ---------- Main ----------
 
-def run_eval():
+def run_eval(quick: bool = False):
     db.pool.open()
-    cases = json.loads(GOLDEN_FILE.read_text())
+    source = QUICK_FILE if quick else GOLDEN_FILE
+    cases = json.loads(source.read_text())
+    label = "Quick Eval (5 Qs)" if quick else f"Golden Eval — {len(cases)} questions"
     results = []
     passed = 0
 
     print(f"\n{'='*60}")
-    print(f"  Synthio Golden Eval — {len(cases)} questions")
+    print(f"  Synthio {label}")
     print(f"{'='*60}\n")
 
     for i, case in enumerate(cases, 1):
@@ -116,18 +133,20 @@ def run_eval():
         print(f"  Q: {question}")
 
         try:
-            answer, elapsed = run_agent(question)
+            answer, elapsed, steps = run_agent(question)
+            print_steps(steps)
             ok, detail = grade(case, answer)
         except Exception as e:
             answer = f"ERROR: {e}"
             ok, detail = False, str(e)
             elapsed = 0.0
+            steps = []
 
         status = "✓ PASS" if ok else "✗ FAIL"
         if ok:
             passed += 1
         print(f"  {status}  ({elapsed}s)  {detail}")
-        print(f"  A: {answer[:120].strip()}{'…' if len(answer) > 120 else ''}\n")
+        print(f"  A: {answer[:200].strip()}{'…' if len(answer) > 200 else ''}\n")
 
         results.append({
             "id": qid,
@@ -136,6 +155,7 @@ def run_eval():
             "passed": ok,
             "detail": detail,
             "elapsed": elapsed,
+            "steps": [(getattr(a, "tool", "?"), getattr(a, "tool_input", ""), str(o)) for a, o in steps],
         })
 
     total = len(cases)
@@ -163,8 +183,19 @@ def run_eval():
         lines += [
             f"### {icon} {r['id']}",
             f"**Q:** {r['question']}  ",
-            f"**A:** {r['answer'][:500]}",
-            f"**Grade:** {r['detail']}",
+            f"**Grade:** {r['detail']}  ",
+            "",
+        ]
+        if r["steps"]:
+            lines.append("**Trace:**")
+            lines.append("```")
+            for tool_name, tool_input, output in r["steps"]:
+                lines.append(f"→ {tool_name}({_preview(tool_input, 120)})")
+                lines.append(f"← {_preview(output, 200)}")
+            lines.append("```")
+            lines.append("")
+        lines += [
+            f"**Answer:** {r['answer'][:500]}{'…' if len(r['answer']) > 500 else ''}",
             "",
         ]
 
@@ -174,5 +205,7 @@ def run_eval():
 
 
 if __name__ == "__main__":
-    passed, total = run_eval()
-    sys.exit(0 if passed >= 10 else 1)
+    quick = "--quick" in sys.argv
+    passed, total = run_eval(quick=quick)
+    threshold = 4 if quick else 10
+    sys.exit(0 if passed >= threshold else 1)

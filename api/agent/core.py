@@ -1,16 +1,4 @@
-"""LangChain tool-calling agent over Postgres.
-
-Tools wired up here:
-  - list_schema: introspect tables/columns
-  - run_sql: execute read-only SQL against Postgres
-  - run_python: subprocess-sandboxed pandas/numpy/statsmodels
-  - make_chart: validate Vega-Lite spec and emit it for the frontend
-
-Day 1 ships list_schema + run_sql. run_python and make_chart are wired but
-their bodies live in tools_extra.py (Day 2). Imports are lazy so we don't
-break on Day 1 if statsmodels isn't installed yet.
-"""
-from __future__ import annotations
+"""LangChain tool-calling agent over Postgres."""
 
 import json
 import os
@@ -22,7 +10,7 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 
 import db
-import prompts
+from . import prompts
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 PRIMARY_MODEL = os.environ.get("OPENROUTER_MODEL", "moonshotai/kimi-k2.6")
@@ -104,21 +92,15 @@ def run_sql(query: str) -> str:
 
 @tool
 def run_python(code: str) -> str:
-    """Run Python (pandas/numpy/statsmodels/scipy/sklearn pre-imported, plus a `query(sql)` helper that returns a DataFrame). 5s timeout, no network. Use ONLY for stats/regression/simulation that SQL can't express. Print results — anything not printed is lost."""
-    try:
-        from tools_extra import run_python_sandbox
-    except ImportError:
-        return "ERROR: run_python is not yet enabled in this build."
+    """Run Python (pandas/numpy pre-imported, plus a `query(sql)` helper that returns a DataFrame). 10s timeout. Use ONLY for simulation or multi-step computation that SQL can't express. Print results — anything not printed is lost."""
+    from .tools import run_python_sandbox
     return run_python_sandbox(code)
 
 
 @tool
 def make_chart(data_json: str, vega_lite_spec: str) -> str:
     """Render a Vega-Lite chart for the user. data_json is a JSON array of records; vega_lite_spec is a JSON string of the Vega-Lite spec (without the `data` field — it will be injected). Returns a confirmation; the chart is shown to the user automatically."""
-    try:
-        from tools_extra import build_chart
-    except ImportError:
-        return "ERROR: make_chart is not yet enabled in this build."
+    from .tools import build_chart
     return build_chart(data_json, vega_lite_spec)
 
 
@@ -159,7 +141,6 @@ def build_executor() -> AgentExecutor:
     )
 
 
-# Lazy singleton — only construct when first needed (so DB bootstrap can run first).
 _executor: AgentExecutor | None = None
 
 

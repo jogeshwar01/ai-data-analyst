@@ -1,5 +1,4 @@
 """Postgres connection pool + one-shot CSV bootstrap."""
-from __future__ import annotations
 
 import os
 from pathlib import Path
