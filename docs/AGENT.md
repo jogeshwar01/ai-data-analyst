@@ -2,9 +2,9 @@
 
 ## Overview
 
-The agent is a LangChain tool-calling agent backed by Kimi K2.6 (via OpenRouter). It receives a natural language question, decides which tools to call, runs them against Postgres, and returns a written answer - all streamed to the frontend in real time.
+The agent is a LangChain ReAct agent (`create_react_agent`) backed by a configurable model via OpenRouter. It receives a natural language question, reasons through it step by step, calls tools against Postgres, and returns a written answer — all streamed to the frontend in real time.
 
-It does **not** use a ReAct loop or hand-rolled reasoning. It uses the model's native function-calling API, which means the LLM decides in a single structured response which tool to invoke and with what arguments. LangChain handles dispatch, retries, and the iteration loop.
+It uses a text-based ReAct loop rather than the model's native function-calling API. Before every tool call the model writes an explicit `Thought:` explaining its reasoning. This produces interpretable traces and tends to handle multi-step questions better. The tradeoff is more tokens per turn. LangChain handles dispatch, retries, and the iteration loop. See [react-agent.md](react-agent.md) for the full implementation breakdown.
 
 ---
 
@@ -49,9 +49,10 @@ The FastAPI `/chat` endpoint uses `AgentExecutor.astream_events(version="v2")` w
 
 | LangChain event | SSE event | Frontend action |
 |---|---|---|
-| `on_tool_start` | `tool_start` | Show collapsible tool trace header |
+| `on_chat_model_stream` (pre-action tokens) | `thought` | Push collapsible reasoning row |
+| `on_tool_start` | `tool_start` | Push running tool trace row |
 | `on_tool_end` | `tool_end` | Fill trace with SQL/output/chart |
-| `on_chat_model_stream` | `token` | Append to answer bubble |
+| `on_chat_model_stream` (post–Final Answer) | `token` | Append to answer bubble |
 | _(stream ends)_ | `done` | Finalize answer, write to logs.md |
 
 The frontend uses a `fetch`-based SSE client (not `EventSource`) because `EventSource` doesn't support POST requests.

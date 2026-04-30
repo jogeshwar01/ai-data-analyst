@@ -3,7 +3,7 @@ import { Send, Loader2, ChevronDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Chart } from "./Chart";
-import { API_URL, Message, ToolCall } from "../api";
+import { API_URL, Message, MessageStep, ToolStep } from "../api";
 import { streamSSE } from "../lib/sse";
 import { cn } from "../lib/utils";
 
@@ -37,7 +37,7 @@ export function Chat({ seedInput }: { seedInput?: string }) {
 		setInput("");
 
 		const userMsg: Message = { role: "user", text };
-		const asstMsg: Message = { role: "assistant", text: "", toolCalls: [] };
+		const asstMsg: Message = { role: "assistant", text: "", steps: [] };
 		setMessages((m) => [...m, userMsg, asstMsg]);
 
 		try {
@@ -48,35 +48,21 @@ export function Chat({ seedInput }: { seedInput?: string }) {
 					setMessages((m) => {
 						const last = m[m.length - 1];
 						if (last.role !== "assistant") return m;
-						const updated = {
-							...last,
-							toolCalls: [...(last.toolCalls || [])],
-						};
+						const updated = { ...last, steps: [...(last.steps || [])] };
 
-						if (event === "tool_start") {
-							updated.toolCalls!.push({
-								name: data.name,
-								input: data.input,
-								status: "running",
-							});
+						if (event === "thought") {
+							updated.steps!.push({ type: "thought", text: data.text });
+						} else if (event === "tool_start") {
+							updated.steps!.push({ type: "tool", name: data.name, input: data.input, status: "running" });
 						} else if (event === "tool_end") {
-							const idx = [...updated.toolCalls!]
-								.reverse()
-								.findIndex(
-									(tc) =>
-										tc.name === data.name &&
-										tc.status === "running",
-								);
-							if (idx >= 0) {
-								const realIdx =
-									updated.toolCalls!.length - 1 - idx;
-								updated.toolCalls![realIdx] = {
-									...updated.toolCalls![realIdx],
-									output: data.output,
-									status: "done",
-								};
+							const steps = updated.steps!;
+							for (let i = steps.length - 1; i >= 0; i--) {
+								const s = steps[i] as ToolStep;
+								if (s.type === "tool" && s.name === data.name && s.status === "running") {
+									steps[i] = { ...s, output: data.output, status: "done" };
+									break;
+								}
 							}
-							// Hoist chart spec to message level for prominent rendering.
 							if (data.name === "make_chart" && data.output) {
 								try {
 									const parsed = JSON.parse(data.output);
@@ -84,7 +70,6 @@ export function Chat({ seedInput }: { seedInput?: string }) {
 								} catch { /* ignore */ }
 							}
 						} else if (event === "token") {
-							// Suppress leading whitespace so the bubble stays in "thinking..." state until real text arrives.
 							if (!updated.text && !data.text.trim()) return m;
 							updated.text += data.text;
 						} else if (event === "done") {
@@ -186,11 +171,13 @@ function MessageBubble({ msg }: { msg: Message }) {
 						: "bg-zinc-900 border border-zinc-800",
 				)}
 			>
-				{msg.toolCalls && msg.toolCalls.length > 0 && (
+				{msg.steps && msg.steps.length > 0 && (
 					<div className="space-y-2 mb-3">
-						{msg.toolCalls.map((tc, j) => (
-							<ToolCallView key={j} tc={tc} />
-						))}
+						{msg.steps.map((step, j) =>
+							step.type === "thought"
+								? <ThinkingSection key={j} thought={step.text} />
+								: <ToolCallView key={j} tc={step} />
+						)}
 					</div>
 				)}
 				{msg.role === "assistant" ? (
@@ -264,19 +251,61 @@ const mdComponents = {
 	),
 };
 
+// ---------- Reasoning / thought rendering ----------
+
+function ThinkingSection({ thought }: { thought: string }) {
+	const [open, setOpen] = useState(false);
+	const preview = thought.split("\n")[0].trim().slice(0, 90);
+	return (
+		<div className="rounded border border-zinc-700/50 bg-zinc-800/30 text-xs">
+			<button
+				onClick={() => setOpen((o) => !o)}
+				className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-zinc-800/60"
+			>
+				<span className="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0" />
+				<span className="text-zinc-400 truncate flex-1">{preview}</span>
+				<ChevronDown
+					className={cn(
+						"w-3 h-3 text-zinc-600 shrink-0 transition-transform duration-200",
+						open && "rotate-180",
+					)}
+				/>
+			</button>
+			<div
+				className={cn(
+					"overflow-hidden transition-all duration-200 ease-in-out",
+					open ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
+				)}
+			>
+				<div className="px-3 py-3 border-t border-zinc-700/40">
+					<pre className="text-zinc-400 whitespace-pre-wrap break-words text-[11px] font-mono leading-relaxed max-h-64 overflow-y-auto">
+						{thought}
+					</pre>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 // ---------- Tool call rendering ----------
 
-function ToolCallView({ tc }: { tc: ToolCall }) {
+function ToolCallView({ tc }: { tc: ToolStep }) {
 	const [open, setOpen] = useState(false);
 	const inputObj =
 		typeof tc.input === "string"
 			? (safeParse(tc.input) ?? tc.input)
 			: (tc.input ?? {});
-	const sql: string | undefined = inputObj?.query;
-	const code: string | undefined = inputObj?.code;
-	const tableArg: string | undefined = inputObj?.table;
 
-	const preview = (sql ?? code ?? tableArg ?? JSON.stringify(inputObj) ?? "")
+	// For ReAct, input arrives as a plain string — route it by tool name.
+	const isPlainString = typeof inputObj === "string";
+	const sql: string | undefined =
+		inputObj?.query ?? (isPlainString && tc.name === "run_sql" ? inputObj : undefined);
+	const code: string | undefined =
+		inputObj?.code ?? (isPlainString && tc.name === "run_python" ? inputObj : undefined);
+	const tableArg: string | undefined =
+		inputObj?.table ?? (isPlainString && tc.name === "list_schema" ? inputObj : undefined);
+
+	const preview = (sql ?? code ?? tableArg ?? (isPlainString ? inputObj : JSON.stringify(inputObj)) ?? "")
 		.replace(/\s+/g, " ")
 		.trim()
 		.slice(0, 90);
@@ -320,6 +349,7 @@ function ToolCallView({ tc }: { tc: ToolCall }) {
 					{!sql &&
 						!code &&
 						!tableArg &&
+						!isPlainString &&
 						Object.keys(inputObj).length > 0 && (
 							<CodeBlock
 								label="input"

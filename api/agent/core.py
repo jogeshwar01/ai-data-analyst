@@ -4,8 +4,8 @@ import json
 import os
 from typing import Any
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 
@@ -112,9 +112,24 @@ def run_python(code: str) -> str:
 
 
 @tool
-def make_chart(data_json: str, vega_lite_spec: str) -> str:
+def make_chart(data_json: str, vega_lite_spec: str = "{}") -> str:
     """Render a Vega-Lite chart for the user. data_json is a JSON array of records; vega_lite_spec is a JSON string of the Vega-Lite spec (without the `data` field - it will be injected). Returns a confirmation; the chart is shown to the user automatically."""
     from .tools import build_chart
+
+    # Handle case where model embeds both data_json and vega_lite_spec in a single JSON object
+    if not vega_lite_spec or vega_lite_spec == "{}":
+        try:
+            payload = json.loads(data_json)
+            if isinstance(payload, dict) and "vega_lite_spec" in payload:
+                d = payload.get("data_json", "[]")
+                v = payload.get("vega_lite_spec", "{}")
+                if isinstance(d, (list, dict)):
+                    d = json.dumps(d)
+                if isinstance(v, dict):
+                    v = json.dumps(v)
+                return build_chart(d, v)
+        except (json.JSONDecodeError, TypeError):
+            pass
 
     return build_chart(data_json, vega_lite_spec)
 
@@ -134,13 +149,26 @@ def _jsonable(v: Any) -> Any:
 
 TOOLS = [list_schema, run_sql, run_python, make_chart]
 
-PROMPT_TEMPLATE = ChatPromptTemplate.from_messages(
-    [
-        ("system", prompts.ASSISTANT_PROMPT),
-        MessagesPlaceholder("chat_history", optional=True),
-        ("human", "{input}"),
-        MessagesPlaceholder("agent_scratchpad"),
-    ]
+_REACT_PROMPT = PromptTemplate.from_template(
+    prompts.ASSISTANT_PROMPT
+    + """
+Available tools:
+{tools}
+
+Use EXACTLY this format — no deviations:
+
+Thought: your reasoning (which table/view/column to use and why)
+Action: one of [{tool_names}]
+Action Input: the tool input (plain SQL string for run_sql; plain Python for run_python; JSON object for make_chart)
+Observation: the tool result
+... (repeat Thought/Action/Action Input/Observation as needed, up to 10 times)
+Thought: I now know the final answer
+Final Answer: your complete answer
+
+Begin!
+
+Question: {input}
+Thought:{agent_scratchpad}"""
 )
 
 
@@ -148,7 +176,7 @@ def build_executor() -> AgentExecutor:
     primary = _build_llm(PRIMARY_MODEL)
     fallback = _build_llm(FALLBACK_MODEL)
     llm = primary.with_fallbacks([fallback])
-    agent = create_tool_calling_agent(llm, TOOLS, PROMPT_TEMPLATE)
+    agent = create_react_agent(llm, TOOLS, _REACT_PROMPT)
     return AgentExecutor(
         agent=agent,
         tools=TOOLS,
