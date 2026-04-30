@@ -18,9 +18,11 @@ SCHEMA_DOC = """\
 - fact_payor_mix(account_id, date_id, payor_type [Commercial | Medicare | Medicaid | Other], pct_of_volume) — monthly snapshots, pct in 0–100
 - fact_ln_metrics(entity_type [H=HCP | A=Account], entity_id, quarter_id e.g. '2024Q4', ln_patient_cnt, est_market_share)
 
-## Convenience views (prefer these)
-- v_rx_enriched: fact_rx joined with hcp + territory + date columns
-- v_activity_enriched: fact_rep_activity joined with rep + hcp + date columns
+## Convenience views (prefer these for joins — avoids verbose JOIN chains)
+- v_rx_enriched(hcp_id, **hcp_name**, specialty, tier, territory_id, territory_name, date_id, calendar_date, year, quarter, brand_code, trx_cnt, nrx_cnt)
+- v_activity_enriched(activity_id, rep_id, **rep_name**, region, hcp_id, **hcp_name**, specialty, tier, territory_id, account_id, date_id, calendar_date, activity_type, status, duration_min)
+
+Note: use `hcp_name` in the views, NOT `full_name` (that column only exists in hcp_dim directly).
 
 ## Domain notes
 - TRx = total prescriptions (trx_cnt). NRx = new prescriptions (nrx_cnt).

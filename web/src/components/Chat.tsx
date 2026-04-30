@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Chart } from "./Chart";
 import { API_URL, Message, ToolCall } from "../api";
 import { streamSSE } from "../lib/sse";
 import { cn } from "../lib/utils";
@@ -74,6 +75,13 @@ export function Chat({ seedInput }: { seedInput?: string }) {
 									output: data.output,
 									status: "done",
 								};
+							}
+							// Hoist chart spec to message level for prominent rendering.
+							if (data.name === "make_chart" && data.output) {
+								try {
+									const parsed = JSON.parse(data.output);
+									if (parsed.__type === "chart") updated.chart = parsed.spec;
+								} catch { /* ignore */ }
 							}
 						} else if (event === "token") {
 							// Suppress leading whitespace so the bubble stays in "thinking..." state until real text arrives.
@@ -169,12 +177,7 @@ export function Chat({ seedInput }: { seedInput?: string }) {
 function MessageBubble({ msg }: { msg: Message }) {
 	const hasText = msg.text.trim().length > 0;
 	return (
-		<div
-			className={cn(
-				"max-w-3xl mx-auto",
-				msg.role === "user" ? "ml-auto" : "",
-			)}
-		>
+		<div className={cn("max-w-3xl mx-auto", msg.role === "user" ? "ml-auto" : "")}>
 			<div
 				className={cn(
 					"rounded-lg px-4 py-3",
@@ -193,10 +196,7 @@ function MessageBubble({ msg }: { msg: Message }) {
 				{msg.role === "assistant" ? (
 					hasText ? (
 						<div className="text-sm leading-relaxed space-y-2">
-							<ReactMarkdown
-								remarkPlugins={[remarkGfm]}
-								components={mdComponents}
-							>
+							<ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
 								{msg.text}
 							</ReactMarkdown>
 						</div>
@@ -204,10 +204,9 @@ function MessageBubble({ msg }: { msg: Message }) {
 						<em className="text-zinc-500 text-sm">thinking…</em>
 					)
 				) : (
-					<div className="text-sm whitespace-pre-wrap leading-relaxed">
-						{msg.text}
-					</div>
+					<div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</div>
 				)}
+				{msg.chart && <Chart spec={msg.chart} />}
 			</div>
 		</div>
 	);

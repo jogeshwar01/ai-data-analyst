@@ -11,4 +11,5 @@ export type Message = {
   role: "user" | "assistant";
   text: string;
   toolCalls?: ToolCall[];
+  chart?: object; // Vega-Lite spec, set when agent calls make_chart
 };
