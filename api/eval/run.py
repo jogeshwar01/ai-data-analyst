@@ -83,7 +83,9 @@ def grade_llm_judge(answer: str, rubric: str) -> tuple[bool, str]:
 def run_agent(question: str) -> tuple[str, float, list]:
     executor = get_executor()
     t0 = time.time()
-    result = executor.invoke({"input": question})
+    result = executor.invoke(
+        {"input": question, "chat_history": "No prior questions in this eval run."}
+    )
     elapsed = round(time.time() - t0, 1)
     steps = result.get("intermediate_steps", [])
     return result.get("output", ""), elapsed, steps

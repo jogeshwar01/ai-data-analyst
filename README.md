@@ -5,20 +5,22 @@ Ask questions in plain English from CSV data (about GAZYVA sales data). The agen
 ## Architecture
 
 ```
-React -> FastAPI -> LangChain Agent -> OpenRouter (Kimi K2.6)
-                         |
-                  +------+------+
-                  |             |
-               Postgres       Redis
+React -> FastAPI -> LangChain ReAct Agent -> OpenRouter (configurable)
+                            |
+                     +------+------+
+                     |             |
+                  Postgres       Redis
 ```
 
-The frontend sends your question to a FastAPI backend over SSE. A LangChain agent picks the right tool (SQL query, Python computation, or chart), runs it against Postgres, and streams the answer back token by token. Tool calls are shown inline so you can see the exact SQL that ran.
+The frontend sends your question to a FastAPI backend over SSE. A LangChain ReAct agent reasons through the question step by step — writing a thought before every tool call — then runs the right tool (SQL query, Python computation, or chart) against Postgres and streams the answer back token by token. Reasoning steps and tool calls are shown inline in arrival order so you can follow exactly how the agent reached its answer.
 
-The stack: React + Vite on the frontend, FastAPI + LangChain on the backend, Postgres for the data, Redis to cache the insight cards, OpenRouter for the LLM (Kimi K2.6, with GPT-4o-mini as fallback).
+The stack: React + Vite on the frontend, FastAPI + LangChain on the backend, Postgres for the data, Redis to cache the insight cards and last five chat turns, OpenRouter for the LLM (model configurable via `OPENROUTER_MODEL` in `.env`).
 
 ## Agent
 
-The agent is built with LangChain's tool-calling interface. It gets the full schema in its system prompt and chooses tools based on the question. Primary model is `moonshotai/kimi-k2.6` via OpenRouter, with `openai/gpt-4o-mini` as automatic fallback.
+The agent uses LangChain's ReAct loop (`create_react_agent`). Before every tool call the model writes a `Thought:` explaining its reasoning, then picks an action. After seeing the result it reasons again — and so on until it writes `Final Answer:`. The full thought+action sequence streams to the frontend in the order it was produced, so reasoning and tool traces interleave rather than appearing in separate sections.
+
+Primary model is set via `OPENROUTER_MODEL` in `.env` (default `moonshotai/kimi-k2.6`). `OPENROUTER_FALLBACK_MODEL` is tried automatically on 429s or 5xx errors. Models that follow the ReAct text format reliably include Qwen3, Gemini Flash variants, and GPT-4o-mini. See [docs/react-agent.md](docs/react-agent.md) for implementation details.
 
 | Tool          | What it does                                                                                                                                                                            |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -116,17 +118,13 @@ web/src/
 
 ## Notes
 
-Chat logs are saved to `api/logs.md` after each conversation. The agent is explained in detail in `assignment/agent.md`.
+Chat logs are saved to `api/logs.md` after each conversation. Chat memory is session-scoped: the browser sends a stable `session_id`, and the API stores the last five completed Q&A turns in Redis with an in-memory fallback. The agent is explained in detail in `assignment/agent.md`.
 
 ## Production Improvements
 
 ### Code Sandbox
 
 `run_python` currently uses a subprocess with a 10s timeout. That works for a local demo but is not safe for production - a malicious or buggy input could exhaust resources or escape the process. The right fix is a proper isolated execution environment like [E2B](https://e2b.dev), Modal, or gVisor. These give you network isolation, memory limits, and per-execution containers.
-
-### React Agent
-
-The current agent is a tool-calling agent - the model picks one tool per step and the loop runs linearly. A ReAct (Reason + Act) agent adds an explicit reasoning step before each action: the model writes out its thought, then acts. This tends to produce better results on multi-step questions because the model plans before calling tools. The tradeoff is more tokens per turn and slightly slower responses. LangChain supports this via `create_react_agent` and it would be a one-file change in `agent/core.py`.
 
 ### Multiple LLM Providers
 
@@ -138,4 +136,4 @@ A vector DB would not help much here because the full schema fits in the system 
 
 ### Conversation Memory
 
-Each chat request is stateless today. Adding short-term memory (the last N turns injected as `chat_history`) would let users ask follow-up questions like "now filter that by territory 2" without restating the full context. LangChain's `MessagesPlaceholder("chat_history")` is already wired into the prompt template - it just needs a session store (Redis is already in the stack) to persist turns across requests.
+Chat requests include a browser-generated `session_id`. The API stores the last five completed Q&A turns in Redis and injects them as `chat_history`, so users can ask follow-ups like "now filter that by territory 2" without restating the full context.

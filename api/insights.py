@@ -4,20 +4,20 @@ import json
 import os
 from typing import Any
 
-import redis as _redis
+import redis
 
 import db
 
 CACHE_TTL = 3600  # 1 hour
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
-_r: _redis.Redis | None = None
+_r: redis.Redis | None = None
 
 
-def _redis_client() -> _redis.Redis:
+def _redis_client() -> redis.Redis:
     global _r
     if _r is None:
-        _r = _redis.from_url(REDIS_URL, decode_responses=True)
+        _r = redis.from_url(REDIS_URL, decode_responses=True)
     return _r
 
 

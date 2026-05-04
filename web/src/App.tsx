@@ -43,7 +43,7 @@ export default function App() {
       <header className="border-b border-zinc-800 px-6 py-3 flex items-center">
         <div className="flex items-center gap-2 flex-1">
           <Activity className="w-5 h-5 text-emerald-400" />
-          <span className="font-semibold tracking-tight">GAZYVA</span>
+          <span className="font-semibold tracking-tight">AI Analyst</span>
         </div>
         <nav className="flex items-center gap-1">
           {TABS.map(({ id, label, Icon }) => (
