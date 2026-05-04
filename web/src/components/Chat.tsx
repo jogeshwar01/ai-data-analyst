@@ -14,10 +14,13 @@ const SUGGESTIONS = [
 	"Show MoM TRx growth per territory",
 ];
 
+const CHAT_SESSION_STORAGE_KEY = "sessionId";
+
 export function Chat({ seedInput }: { seedInput?: string }) {
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [input, setInput] = useState("");
 	const [busy, setBusy] = useState(false);
+	const [sessionId] = useState(getChatSessionId);
 	const scrollRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -43,7 +46,7 @@ export function Chat({ seedInput }: { seedInput?: string }) {
 		try {
 			await streamSSE(
 				`${API_URL}/chat`,
-				{ message: text },
+				{ message: text, session_id: sessionId },
 				(event, data) => {
 					setMessages((m) => {
 						const last = m[m.length - 1];
@@ -103,11 +106,11 @@ export function Chat({ seedInput }: { seedInput?: string }) {
 				{messages.length === 0 && (
 					<div className="max-w-2xl mx-auto mt-12">
 						<h2 className="text-2xl font-semibold mb-2">
-							Ask anything about the GAZYVA dataset.
+							Ask anything about your dataset.
 						</h2>
 						<p className="text-zinc-400 mb-6">
-							I&apos;ll write SQL or Python, run it against
-							Postgres, and explain the results.
+							I&apos;ll query the data, run calculations, create
+							charts when useful, and explain the results.
 						</p>
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-2">
 							{SUGGESTIONS.map((s) => (
@@ -157,6 +160,14 @@ export function Chat({ seedInput }: { seedInput?: string }) {
 			</div>
 		</div>
 	);
+}
+
+function getChatSessionId() {
+	const existing = window.localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
+	if (existing) return existing;
+	const next = crypto.randomUUID();
+	window.localStorage.setItem(CHAT_SESSION_STORAGE_KEY, next);
+	return next;
 }
 
 function MessageBubble({ msg }: { msg: Message }) {

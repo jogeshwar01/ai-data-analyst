@@ -14,7 +14,7 @@ React -> FastAPI -> LangChain ReAct Agent -> OpenRouter (configurable)
 
 The frontend sends your question to a FastAPI backend over SSE. A LangChain ReAct agent reasons through the question step by step — writing a thought before every tool call — then runs the right tool (SQL query, Python computation, or chart) against Postgres and streams the answer back token by token. Reasoning steps and tool calls are shown inline in arrival order so you can follow exactly how the agent reached its answer.
 
-The stack: React + Vite on the frontend, FastAPI + LangChain on the backend, Postgres for the data, Redis to cache the insight cards, OpenRouter for the LLM (model configurable via `OPENROUTER_MODEL` in `.env`).
+The stack: React + Vite on the frontend, FastAPI + LangChain on the backend, Postgres for the data, Redis to cache the insight cards and last five chat turns, OpenRouter for the LLM (model configurable via `OPENROUTER_MODEL` in `.env`).
 
 ## Agent
 
@@ -118,7 +118,7 @@ web/src/
 
 ## Notes
 
-Chat logs are saved to `api/logs.md` after each conversation. The agent is explained in detail in `assignment/agent.md`.
+Chat logs are saved to `api/logs.md` after each conversation. Chat memory is session-scoped: the browser sends a stable `session_id`, and the API stores the last five completed Q&A turns in Redis with an in-memory fallback. The agent is explained in detail in `assignment/agent.md`.
 
 ## Production Improvements
 
@@ -136,4 +136,4 @@ A vector DB would not help much here because the full schema fits in the system 
 
 ### Conversation Memory
 
-Each chat request is stateless today. Adding short-term memory (the last N turns injected as `chat_history`) would let users ask follow-up questions like "now filter that by territory 2" without restating the full context. LangChain's `MessagesPlaceholder("chat_history")` is already wired into the prompt template - it just needs a session store (Redis is already in the stack) to persist turns across requests.
+Chat requests include a browser-generated `session_id`. The API stores the last five completed Q&A turns in Redis and injects them as `chat_history`, so users can ask follow-ups like "now filter that by territory 2" without restating the full context.

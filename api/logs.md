@@ -384,3 +384,105 @@ This suggests that either the sales force is successfully driving volume through
 
 ---
 
+## 2026-05-04 16:27:39
+**Q:** Top 5 HCPs by TRx in the last 90 days
+
+**Trace:**
+> I will first identify the most recent date in the dataset to define the "last 90 days" window, then query the `v_rx_enriched` view to find the top 5 HCPs by total TRx within that period.
+→ run_sql(WITH bounds AS (SELECT MAX(calendar_date) AS hi FROM date_dim WHERE date_id IN (SELECT date_id FROM fact_rx))
+SELECT v.h)
+← {"columns": ["hcp_name", "specialty", "tier", "total_trx"], "rows": [["Dr Sage Jackson", "Internal Medicine", "B", 86], ["Dr Blake Garcia", "Rheumatology", "C", 84], ["Dr Cameron Clark", "Rheumatology
+> The top 5 HCPs by total TRx for GAZYVA over the last 90 days (relative to the latest data on 2025-12-31) are:  1.  **Dr Sage Jackson** (Internal Medicine, Tier B): 86 TRx 2.  **Dr Blake Garcia** (Rheu
+> I have successfully retrieved the top 5 HCPs by total TRx volume for the last 90 days of available data (ending 2025-12-31).
+→ make_chart({
+  "data_json": "[{\"hcp_name\": \"Dr Sage Jackson\", \"total_trx\": 86}, {\"hcp_name\": \"Dr Blake Garcia\", \"total_t)
+← {"__type": "chart", "spec": {"mark": "bar", "encoding": {"x": {"field": "total_trx", "type": "quantitative", "title": "Total TRx"}, "y": {"field": "hcp_name", "type": "nominal", "sort": "-x", "title":
+> The top 5 HCPs by total TRx for GAZYVA over the last 90 days (ending 2025-12-31) are:  1.  **Dr Sage Jackson** (Internal Medicine, Tier B): 86 TRx 2.  **Dr Blake Garcia** (Rheumatology, Tier C): 84 TR
+> The top 5 HCPs by total TRx for GAZYVA over the last 90 days (ending 2025-12-31) are:  1.  **Dr Sage Jackson** (Internal Medicine, Tier B): 86 TRx 2.  **Dr Blake Garcia** (Rheumatology, Tier C): 84 TR
+> I have identified the top 5 HCPs by total TRx volume for the last 90 days of available data (ending 2025-12-31).
+
+**A:** The top 5 HCPs by total TRx for GAZYVA over the last 90 days (ending 2025-12-31) are:
+
+1. **Dr Sage Jackson** (Internal Medicine, Tier B): 86 TRx
+2. **Dr Blake Garcia** (Rheumatology, Tier C): 84 TRx
+3. **Dr Cameron Clark** (Rheumatology, Tier C): 83 TRx
+4. **Dr Phoenix Lee** (Rheumatology, Tier B): 79 TRx
+5. **Dr Hayden Jackson** (Internal Medicine, Tier A): 77 TRx
+
+The list is led by Internal Medicine and Rheumatology specialists. Notably, Tier B and C HCPs are currently outperforming Tier A providers in this specific 90-day window.
+
+---
+
+## 2026-05-04 16:28:06
+**Q:** Can we do for last year
+
+**Trace:**
+> I will interpret "last year" as the full calendar year 2025, as the dataset coverage extends through December 31, 2025. I'll use the `v_rx_enriched` view to aggregate TRx by HCP for the year 2025 and 
+→ run_sql(SELECT hcp_name, specialty, tier, SUM(trx_cnt) AS total_trx
+FROM v_rx_enriched
+WHERE year = 2025
+GROUP BY 1, 2, 3
+ORDER )
+← {"columns": ["hcp_name", "specialty", "tier", "total_trx"], "rows": [["Dr Quinn Johnson", "Internal Medicine", "B", 275], ["Dr Sydney Johnson", "Internal Medicine", "A", 266], ["Dr Phoenix Lee", "Rheu
+> The top 5 HCPs by total TRx for GAZYVA during the full calendar year 2025 are:  1.  **Dr Quinn Johnson** (Internal Medicine, Tier B): 275 TRx 2.  **Dr Sydney Johnson** (Internal Medicine, Tier A): 266
+> I will calculate the top 5 HCPs by total TRx for the full calendar year 2025 using the `v_rx_enriched` view.
+→ run_sql(SELECT hcp_name, specialty, tier, SUM(trx_cnt) AS total_trx
+FROM v_rx_enriched
+WHERE year = 2025
+GROUP BY 1, 2, 3
+ORDER )
+← {"columns": ["hcp_name", "specialty", "tier", "total_trx"], "rows": [["Dr Quinn Johnson", "Internal Medicine", "B", 275], ["Dr Sydney Johnson", "Internal Medicine", "A", 266], ["Dr Phoenix Lee", "Rheu
+> The top 5 HCPs by total TRx for GAZYVA during the full calendar year 2025 are:  1. **Dr Quinn Johnson** (Internal Medicine, Tier B): 275 TRx 2. **Dr Sydney Johnson** (Internal Medicine, Tier A): 266 T
+> I will calculate the top 5 HCPs by total TRx for the full calendar year 2025 using the `v_rx_enriched` view.
+→ run_sql(SELECT hcp_name, specialty, tier, SUM(trx_cnt) AS total_trx FROM v_rx_enriched WHERE year = 2025 GROUP BY 1, 2, 3 ORDER )
+← {"columns": ["hcp_name", "specialty", "tier", "total_trx"], "rows": [["Dr Quinn Johnson", "Internal Medicine", "B", 275], ["Dr Sydney Johnson", "Internal Medicine", "A", 266], ["Dr Phoenix Lee", "Rheu
+> I have the top 5 HCPs by total TRx for the full calendar year 2025. The results show a mix of specialties, with Internal Medicine and Rheumatology leading the volume.
+
+**A:** The top 5 HCPs by total TRx for GAZYVA during the full calendar year 2025 are:
+
+1. **Dr Quinn Johnson** (Internal Medicine, Tier B): 275 TRx
+2. **Dr Sydney Johnson** (Internal Medicine, Tier A): 266 TRx
+3. **Dr Phoenix Lee** (Rheumatology, Tier B): 263 TRx
+4. **Dr Blake Garcia** (Rheumatology, Tier C): 263 TRx
+5. **Dr Jamie Davis** (Nephrology, Tier B): 244 TRx
+
+The 2025 rankings show a strong performance from Internal Medicine and Rheumatology, with Tier B HCPs representing the majority of the top spots. Notably, **Dr Phoenix Lee** and **Dr Blake Garcia** maintained their positions in the top 5 from the previous 90-day analysis, indicating consistent high-volume prescribing throughout the year.
+
+---
+
+## 2026-05-04 16:28:47
+**Q:** can you create a bar chart
+
+**Trace:**
+> I will retrieve the total TRx for the top 5 HCPs in 2025 to provide the data for the bar chart.
+→ run_sql("SELECT hcp_name, SUM(trx_cnt) AS total_trx FROM v_rx_enriched WHERE year = 2025 GROUP BY 1 ORDER BY total_trx DESC LIMI)
+← {"columns": ["hcp_name", "total_trx"], "rows": [["Dr Quinn Johnson", 275], ["Dr Sydney Johnson", 266], ["Dr Phoenix Lee", 263], ["Dr Blake Garcia", 263], ["Dr Hayden Jackson", 244]], "row_count": 5, "
+→ make_chart({
+  "data_json": "[{\"hcp_name\": \"Dr Quinn Johnson\", \"total_trx\": 275}, {\"hcp_name\": \"Dr Sydney Johnson\", \"tot)
+← {"__type": "chart", "spec": {"mark": "bar", "encoding": {"x": {"field": "total_trx", "type": "quantitative", "title": "Total TRx (2025)"}, "y": {"field": "hcp_name", "type": "nominal", "sort": "-x", "
+> I have created a bar chart showing the top 5 HCPs by total GAZYVA TRx for the calendar year 2025.  **Top 5 HCPs in 2025:** 1. **Dr Quinn Johnson**: 275 TRx 2. **Dr Sydney Johnson**: 266 TRx 3. **Dr Ph
+> I will retrieve the total TRx for the top 5 HCPs in 2025 to provide the data for the bar chart.
+→ run_sql("SELECT hcp_name, SUM(trx_cnt) AS total_trx FROM v_rx_enriched WHERE year = 2025 GROUP BY 1 ORDER BY total_trx DESC LIMI)
+← {"columns": ["hcp_name", "total_trx"], "rows": [["Dr Quinn Johnson", 275], ["Dr Sydney Johnson", 266], ["Dr Phoenix Lee", 263], ["Dr Blake Garcia", 263], ["Dr Hayden Jackson", 244]], "row_count": 5, "
+→ make_chart({
+  "data_json": "[{\"hcp_name\": \"Dr Quinn Johnson\", \"total_trx\": 275}, {\"hcp_name\": \"Dr Sydney Johnson\", \"tot)
+← {"__type": "chart", "spec": {"mark": "bar", "encoding": {"x": {"field": "total_trx", "type": "quantitative", "title": "Total TRx (2025)"}, "y": {"field": "hcp_name", "type": "nominal", "sort": "-x", "
+> I have generated a bar chart visualizing the top 5 HCPs by total GAZYVA TRx for the calendar year 2025.
+→ make_chart({
+  "data_json": "[{\"hcp_name\": \"Dr Quinn Johnson\", \"total_trx\": 275}, {\"hcp_name\": \"Dr Sydney Johnson\", \"tot)
+← {"__type": "chart", "spec": {"mark": "bar", "encoding": {"x": {"field": "total_trx", "type": "quantitative", "title": "Total TRx (2025)"}, "y": {"field": "hcp_name", "type": "nominal", "sort": "-x", "
+> I have generated a bar chart visualizing the top 5 HCPs by total GAZYVA TRx for the calendar year 2025.
+
+**A:** I have created a bar chart showing the top 5 HCPs by total GAZYVA TRx for the calendar year 2025.
+
+**Top 5 HCPs in 2025:**
+1. **Dr Quinn Johnson**: 275 TRx
+2. **Dr Sydney Johnson**: 266 TRx
+3. **Dr Phoenix Lee**: 263 TRx
+4. **Dr Blake Garcia**: 263 TRx
+5. **Dr Hayden Jackson**: 244 TRx
+
+The chart visualizes the high volume of prescriptions from these top providers, led by Dr. Quinn Johnson.
+
+---
+

@@ -54,6 +54,7 @@ SYSTEM_PROMPT = f"""You are a senior pharma commercial-analytics analyst. You an
 8. When listing people (HCPs, reps) always write every name individually. Never use "e.g." or truncate with "..." - list all of them.
 9. For what-if or simulation questions: do it in ONE run_python call. Load data with query(), compute the ratio or trend from historical data, simulate the new scenario, compute 95% CI using std dev, and print all results. Never split across multiple Python calls.
 10. For anomaly or open-ended exploration questions: write ONE Python script that runs multiple analyses (outlier detection, top/bottom ranks, variance checks) and prints a numbered list of findings with specific names and numbers.
+11. Use conversation context only to resolve follow-up references like "that", "same thing", "now filter it", or "compare to the prior answer". If the current question is standalone, ignore old context.
 """
 
 FEW_SHOTS = """\

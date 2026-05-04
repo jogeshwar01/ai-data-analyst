@@ -6,6 +6,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
+from uuid import UUID
 
 LOGS_FILE = Path(__file__).parent / "logs.md"
 
@@ -35,6 +36,7 @@ from pydantic import BaseModel
 
 import db
 from agent import get_executor
+import conversation
 import insights as insights_mod
 import coach as coach_mod
 
@@ -61,6 +63,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: UUID | None = None
 
 
 def _sse(event: str, data: dict) -> str:
@@ -100,12 +103,14 @@ def _extract_thought_and_input(buf: str) -> tuple[str, str]:
     return thought, action_input
 
 
-async def _stream_chat(message: str):
+async def _stream_chat(message: str, session_id: str | None):
     if not os.environ.get("OPENROUTER_API_KEY"):
         yield _sse("error", {"message": "OPENROUTER_API_KEY not set on the server."})
         return
 
     executor = get_executor()
+    history = conversation.get_chat_history(session_id)
+    chat_history = conversation.format_chat_history(history)
     answer_chunks: list[str] = []
     trace: list[dict] = []
     current_tool: dict | None = None
@@ -117,7 +122,10 @@ async def _stream_chat(message: str):
             trace.append({"type": "thought", "text": text})
 
     try:
-        async for event in executor.astream_events({"input": message}, version="v2"):
+        async for event in executor.astream_events(
+            {"input": message, "chat_history": chat_history},
+            version="v2",
+        ):
             kind = event["event"]
             if kind == "on_tool_start":
                 tool_name = event["name"]
@@ -178,6 +186,7 @@ async def _stream_chat(message: str):
 
         answer = "".join(answer_chunks).strip()
         yield _sse("done", {"answer": answer})
+        conversation.save_chat_turn(session_id, message, answer)
         try:
             _append_chat_log(message, trace, answer)
         except Exception:
@@ -190,7 +199,11 @@ async def _stream_chat(message: str):
 async def chat(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(400, "Empty message")
-    return StreamingResponse(_stream_chat(req.message), media_type="text/event-stream")
+    session_id = str(req.session_id) if req.session_id else None
+    return StreamingResponse(
+        _stream_chat(req.message, session_id),
+        media_type="text/event-stream",
+    )
 
 
 @app.get("/insights")

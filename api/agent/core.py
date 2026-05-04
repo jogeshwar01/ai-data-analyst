@@ -167,6 +167,9 @@ Final Answer: your complete answer
 
 Begin!
 
+Conversation context:
+{chat_history}
+
 Question: {input}
 Thought:{agent_scratchpad}"""
 )
