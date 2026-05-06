@@ -8,37 +8,19 @@ from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
-LOGS_FILE = Path(__file__).parent / "logs.md"
-
-
-def _append_chat_log(message: str, trace: list[dict], answer: str) -> None:
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    lines = [f"## {ts}", f"**Q:** {message}", ""]
-    if trace:
-        lines.append("**Trace:**")
-        for entry in trace:
-            if entry["type"] == "thought":
-                preview = entry["text"].replace("\n", " ").strip()[:200]
-                lines.append(f"> {preview}")
-            else:
-                inp = json.dumps(entry["input"], default=str) if not isinstance(entry["input"], str) else entry["input"]
-                lines.append(f"→ {entry['name']}({inp[:120]})")
-                lines.append(f"← {entry['output'][:200]}")
-        lines.append("")
-    lines += [f"**A:** {answer}", "", "---", ""]
-    with LOGS_FILE.open("a") as f:
-        f.write("\n".join(lines) + "\n")
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import db
-from agent import get_executor
+from agent import get_agent
 import conversation
 import insights as insights_mod
 import coach as coach_mod
+
+
+LOGS_FILE = Path(__file__).parent / "logs.md"
 
 
 @asynccontextmanager
@@ -70,37 +52,48 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
 
 
-_FINAL_MARKER = "Final Answer:"
-_MARKER_LEN = len(_FINAL_MARKER)
+def _append_chat_log(message: str, trace: list[dict], answer: str) -> None:
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines = [f"## {ts}", f"**Q:** {message}", ""]
+    if trace:
+        lines.append("**Trace:**")
+        for entry in trace:
+            if entry["type"] == "thought":
+                preview = entry["text"].replace("\n", " ").strip()[:200]
+                lines.append(f"> {preview}")
+            else:
+                inp = (
+                    json.dumps(entry["input"], default=str)
+                    if not isinstance(entry["input"], str)
+                    else entry["input"]
+                )
+                lines.append(f"→ {entry['name']}({inp[:120]})")
+                lines.append(f"← {entry['output'][:200]}")
+        lines.append("")
+    lines += [f"**A:** {answer}", "", "---", ""]
+    with LOGS_FILE.open("a") as f:
+        f.write("\n".join(lines) + "\n")
 
 
-def _extract_thought_and_input(buf: str) -> tuple[str, str]:
-    """Split ReAct buffer into (thought_text, action_input).
-
-    Separates the Thought reasoning from the Action/Action Input lines.
-    Returns both so thought goes to reasoning UI and action_input becomes tool_input.
-    """
-    text = buf.strip()
-    thought = text
-    action_input = ""
-
-    for sep in ("\nAction:", "Action:"):
-        if sep in text:
-            idx = text.index(sep)
-            thought = text[:idx]
-            rest = text[idx + len(sep):]
-            for ai_sep in ("\nAction Input:", "Action Input:"):
-                if ai_sep in rest:
-                    action_input = rest[rest.index(ai_sep) + len(ai_sep):].strip()
-                    break
-            break
-
-    if thought.startswith("Thought:"):
-        thought = thought[len("Thought:"):].strip()
-    else:
-        thought = thought.strip()
-
-    return thought, action_input
+def _event_text(value) -> str:
+    if value is None:
+        return ""
+    if hasattr(value, "content"):
+        return _event_text(value.content)
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        parts = []
+        for item in value:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                if item.get("type") == "text":
+                    parts.append(str(item.get("text", "")))
+                elif "text" in item:
+                    parts.append(str(item.get("text", "")))
+        return "".join(parts)
+    return str(value)
 
 
 async def _stream_chat(message: str, session_id: str | None):
@@ -108,81 +101,52 @@ async def _stream_chat(message: str, session_id: str | None):
         yield _sse("error", {"message": "OPENROUTER_API_KEY not set on the server."})
         return
 
-    executor = get_executor()
     history = conversation.get_chat_history(session_id)
-    chat_history = conversation.format_chat_history(history)
+    messages = conversation.build_messages(history, message)
+    agent = get_agent()
     answer_chunks: list[str] = []
     trace: list[dict] = []
-    current_tool: dict | None = None
-    thought_buf = ""
-    in_answer = False
-
-    def _emit_thought(text: str) -> None:
-        if text:
-            trace.append({"type": "thought", "text": text})
+    pending_tools: dict[str, dict] = {}
 
     try:
-        async for event in executor.astream_events(
-            {"input": message, "chat_history": chat_history},
+        async for event in agent.astream_events(
+            {"messages": messages},
             version="v2",
         ):
-            kind = event["event"]
+            kind = event.get("event")
             if kind == "on_tool_start":
                 tool_name = event["name"]
-                # Flush buffered thought; also extract Action Input (never in event["data"] for ReAct)
-                thought_text, extracted_input = _extract_thought_and_input(thought_buf)
-                thought_buf = ""
-                if thought_text:
-                    _emit_thought(thought_text)
-                    yield _sse("thought", {"text": thought_text})
-                # Skip internal AgentExecutor error-handling tools
                 if tool_name.startswith("_"):
-                    current_tool = None
                     continue
-                # astream_events v2 always sends input={} for ReAct; use extracted Action Input
-                raw = event["data"].get("input") or None
-                tool_input = raw if (raw and raw != {}) else (extracted_input or {})
-                current_tool = {"name": tool_name, "input": tool_input, "output": ""}
+                tool_input = event.get("data", {}).get("input") or {}
+                run_id = event.get("run_id") or tool_name
+                pending_tools[run_id] = {
+                    "name": tool_name,
+                    "input": tool_input,
+                    "output": "",
+                }
                 yield _sse("tool_start", {"name": tool_name, "input": tool_input})
             elif kind == "on_tool_end":
-                if event["name"].startswith("_") or current_tool is None:
-                    current_tool = None
+                tool_name = event["name"]
+                if tool_name.startswith("_"):
                     continue
+                run_id = event.get("run_id") or tool_name
+                current_tool = pending_tools.pop(
+                    run_id,
+                    {"name": tool_name, "input": {}, "output": ""},
+                )
                 output = event["data"].get("output")
-                if hasattr(output, "content"):
-                    output = output.content
-                out_str = str(output)[:8000]
+                out_str = _event_text(output)[:8000]
                 current_tool["output"] = out_str
                 trace.append({"type": "tool", **current_tool})
-                current_tool = None
-                yield _sse("tool_end", {"name": event["name"], "output": out_str})
+                yield _sse("tool_end", {"name": tool_name, "output": out_str})
             elif kind == "on_chat_model_stream":
-                chunk = event["data"]["chunk"]
-                token = getattr(chunk, "content", "") or ""
+                chunk = event.get("data", {}).get("chunk")
+                token = _event_text(chunk)
                 if token:
-                    if in_answer:
-                        answer_chunks.append(token)
-                        yield _sse("token", {"text": token})
-                    else:
-                        thought_buf += token
-                        if _FINAL_MARKER in thought_buf:
-                            in_answer = True
-                            idx = thought_buf.index(_FINAL_MARKER)
-                            thought, _ = _extract_thought_and_input(thought_buf[:idx])
-                            post = thought_buf[idx + _MARKER_LEN:].lstrip("\n ")
-                            thought_buf = ""
-                            if thought:
-                                _emit_thought(thought)
-                                yield _sse("thought", {"text": thought})
-                            if post:
-                                answer_chunks.append(post)
-                                yield _sse("token", {"text": post})
+                    answer_chunks.append(token)
+                    yield _sse("token", {"text": token})
             await asyncio.sleep(0)
-
-        # Fallback: model didn't write "Final Answer:" — emit buffered content as answer
-        if thought_buf.strip() and not in_answer:
-            answer_chunks.append(thought_buf.strip())
-            yield _sse("token", {"text": thought_buf.strip()})
 
         answer = "".join(answer_chunks).strip()
         yield _sse("done", {"answer": answer})

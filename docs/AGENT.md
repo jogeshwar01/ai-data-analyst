@@ -2,9 +2,9 @@
 
 ## Overview
 
-The agent is a LangChain ReAct agent (`create_react_agent`) backed by a configurable model via OpenRouter. It receives a natural language question, reasons through it step by step, calls tools against Postgres, and returns a written answer — all streamed to the frontend in real time.
+The agent is a LangChain `create_agent` graph runtime backed by a configurable model via OpenRouter. It receives a natural language question, calls structured tools against Postgres, and returns a written answer - all streamed to the frontend in real time.
 
-It uses a text-based ReAct loop rather than the model's native function-calling API. Before every tool call the model writes an explicit `Thought:` explaining its reasoning. This produces interpretable traces and tends to handle multi-step questions better. The tradeoff is more tokens per turn. LangChain handles dispatch, retries, and the iteration loop. See [react-agent.md](react-agent.md) for the full implementation breakdown.
+The implementation uses the newer LangChain agent API, which runs on LangGraph under the hood. Tool calls are provider-native structured calls with Pydantic schemas, so the server no longer parses `Action:` / `Action Input:` / `Final Answer:` text. LangChain handles dispatch, retries, and the iteration loop. See [structured-agent.md](structured-agent.md) for the full implementation breakdown.
 
 ---
 
@@ -45,14 +45,13 @@ The system prompt has three parts:
 
 ## Streaming
 
-The FastAPI `/chat` endpoint uses `AgentExecutor.astream_events(version="v2")` which emits granular events as the agent runs. The server translates these into SSE events:
+The FastAPI `/chat` endpoint passes native LangGraph message state to `agent.astream_events(version="v2")`. The server translates LangChain events into frontend-safe SSE events:
 
 | LangChain event | SSE event | Frontend action |
 |---|---|---|
-| `on_chat_model_stream` (pre-action tokens) | `thought` | Push collapsible reasoning row |
 | `on_tool_start` | `tool_start` | Push running tool trace row |
 | `on_tool_end` | `tool_end` | Fill trace with SQL/output/chart |
-| `on_chat_model_stream` (post–Final Answer) | `token` | Append to answer bubble |
+| `on_chat_model_stream` | `token` | Append to answer bubble |
 | _(stream ends)_ | `done` | Finalize answer, write to logs.md |
 
 The frontend uses a `fetch`-based SSE client (not `EventSource`) because `EventSource` doesn't support POST requests.
@@ -63,7 +62,7 @@ The frontend uses a `fetch`-based SSE client (not `EventSource`) because `EventS
 
 The agent self-corrects on SQL errors without any special logic. Because `run_sql` returns the Postgres error verbatim, the model sees exactly what went wrong (e.g. `column "full_name" does not exist`) and issues a corrected query. If it fails twice, the prompt instructs it to call `list_schema` first to verify column names before retrying.
 
-`max_iterations=10` caps runaway loops. `handle_parsing_errors=True` prevents crashes on malformed tool calls.
+Structured tool validation catches malformed inputs before tool execution. The SQL tool also enforces read-only, single-statement `SELECT`/`WITH` queries in code.
 
 ---
 

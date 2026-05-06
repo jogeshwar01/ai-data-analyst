@@ -307,7 +307,7 @@ function ToolCallView({ tc }: { tc: ToolStep }) {
 			? (safeParse(tc.input) ?? tc.input)
 			: (tc.input ?? {});
 
-	// For ReAct, input arrives as a plain string — route it by tool name.
+	// For ReAct, input arrives as a plain string - route it by tool name.
 	const isPlainString = typeof inputObj === "string";
 	const sql: string | undefined =
 		inputObj?.query ?? (isPlainString && tc.name === "run_sql" ? inputObj : undefined);

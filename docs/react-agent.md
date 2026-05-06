@@ -1,8 +1,10 @@
 # ReAct Agent Implementation
 
+> Legacy note: the app no longer uses this implementation. The current backend uses LangChain `create_agent` with structured tool calling; see [structured-agent.md](structured-agent.md).
+
 ## What Changed and Why
 
-The original agent used LangChain's tool-calling interface (`create_tool_calling_agent`). In that mode the model picks a tool via the function-calling API — one structured JSON object per step, no intermediate text. It works well with models tuned for function-calling (Kimi K2.6, GPT-4o), but the reasoning is opaque: you see which tool ran and what it returned, but not *why* the model chose it.
+The original agent used LangChain's tool-calling interface (`create_tool_calling_agent`). In that mode the model picks a tool via the function-calling API - one structured JSON object per step, no intermediate text. It works well with models tuned for function-calling (Kimi K2.6, GPT-4o), but the reasoning is opaque: you see which tool ran and what it returned, but not *why* the model chose it.
 
 ReAct (**Re**ason + **Act**) is a text-based loop where the model writes its thought out loud before every action:
 
@@ -88,7 +90,7 @@ This extracted string becomes the `input` shown in the tool trace UI.
 
 ## `_Exception` Tool Suppression
 
-When `handle_parsing_errors=True` and the parser fails (e.g. the model forgets `Action:` or adds extra text), LangChain dispatches an internal tool named `_Exception` with the parser error as its input. This is normal — it injects a self-correction prompt and the agent retries.
+When `handle_parsing_errors=True` and the parser fails (e.g. the model forgets `Action:` or adds extra text), LangChain dispatches an internal tool named `_Exception` with the parser error as its input. This is normal - it injects a self-correction prompt and the agent retries.
 
 `_Exception` events are filtered in the SSE handler so they never reach the frontend:
 
@@ -138,7 +140,7 @@ type ToolStep    = { type: "tool"; name: string; input?: any; output?: string; s
 
 When a `thought` SSE event arrives, a `ThoughtStep` is pushed. When `tool_start` arrives, a `ToolStep` with `status: "running"` is pushed. When `tool_end` arrives, the last matching running `ToolStep` is updated in place with the output and `status: "done"`.
 
-Both step types render as collapsible rows — thoughts in a slightly darker grey, tool calls with the tool name and a status dot.
+Both step types render as collapsible rows - thoughts in a slightly darker grey, tool calls with the tool name and a status dot.
 
 ---
 

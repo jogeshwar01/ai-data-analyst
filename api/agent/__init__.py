@@ -1,3 +1,3 @@
-from agent.core import get_executor
+from agent.core import get_agent
 
-__all__ = ["get_executor"]
+__all__ = ["get_agent"]

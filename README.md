@@ -1,26 +1,26 @@
 # AI Analyst for Your Data
 
-Ask questions in plain English from CSV data (about GAZYVA sales data). The agent figures out the SQL, runs it, and explains what it found, showing you exactly what it did along the way.
+Ask questions in plain English over your data. The agent inspects the schema, writes SQL, runs Python analysis when needed, creates charts, and explains the result.
 
 ## Architecture
 
 ```
-React -> FastAPI -> LangChain ReAct Agent -> OpenRouter (configurable)
-                            |
-                     +------+------+
-                     |             |
-                  Postgres       Redis
+React -> FastAPI SSE -> LangChain create_agent -> OpenRouter (configurable)
+                                  |
+                           +------+------+
+                           |             |
+                        Postgres       Redis
 ```
 
-The frontend sends your question to a FastAPI backend over SSE. A LangChain ReAct agent reasons through the question step by step — writing a thought before every tool call — then runs the right tool (SQL query, Python computation, or chart) against Postgres and streams the answer back token by token. Reasoning steps and tool calls are shown inline in arrival order so you can follow exactly how the agent reached its answer.
+The frontend sends your question to a FastAPI backend over SSE. A LangChain `create_agent` runtime uses structured tool calling to inspect schema, run SQL, run Python, or build charts against Postgres, then streams tool events and answer tokens back to the UI.
 
 The stack: React + Vite on the frontend, FastAPI + LangChain on the backend, Postgres for the data, Redis to cache the insight cards and last five chat turns, OpenRouter for the LLM (model configurable via `OPENROUTER_MODEL` in `.env`).
 
 ## Agent
 
-The agent uses LangChain's ReAct loop (`create_react_agent`). Before every tool call the model writes a `Thought:` explaining its reasoning, then picks an action. After seeing the result it reasons again — and so on until it writes `Final Answer:`. The full thought+action sequence streams to the frontend in the order it was produced, so reasoning and tool traces interleave rather than appearing in separate sections.
+The agent uses LangChain's newer `create_agent` API. Tools are called through provider-native structured tool calling with Pydantic argument schemas instead of the old text pattern where the model had to emit `Thought:`, `Action:`, `Action Input:`, and `Final Answer:` markers.
 
-Primary model is set via `OPENROUTER_MODEL` in `.env` (default `moonshotai/kimi-k2.6`). `OPENROUTER_FALLBACK_MODEL` is tried automatically on 429s or 5xx errors. Models that follow the ReAct text format reliably include Qwen3, Gemini Flash variants, and GPT-4o-mini. See [docs/react-agent.md](docs/react-agent.md) for implementation details.
+Primary model is set via `OPENROUTER_MODEL` in `.env` (default `moonshotai/kimi-k2.6`). `OPENROUTER_FALLBACK_MODEL` is tried automatically on 429s or 5xx errors. See [docs/structured-agent.md](docs/structured-agent.md) for implementation details.
 
 | Tool          | What it does                                                                                                                                                                            |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -88,34 +88,6 @@ docker compose exec api python3 -m eval.run --quick
 docker compose exec api python3 -m eval.run
 ```
 
-## Project layout
-
-```
-api/
-  main.py         routes, SSE streaming, chat logging
-  insights.py     the six canned analyses
-  coach.py        rep coaching logic
-  agent/
-    core.py       agent setup and tool definitions
-    prompts.py    system prompt and few-shot examples
-    tools.py      python sandbox and chart builder
-  db/
-    __init__.py   connection pool and CSV bootstrap
-    schema.sql    table definitions and views
-  eval/
-    run.py        eval runner
-    golden.json   11 test questions
-    quick.json    5 faster test questions
-
-web/src/
-  App.tsx
-  components/
-    Chat.tsx
-    InsightCard.tsx
-    RepCoach.tsx
-    Chart.tsx
-```
-
 ## Notes
 
 Chat logs are saved to `api/logs.md` after each conversation. Chat memory is session-scoped: the browser sends a stable `session_id`, and the API stores the last five completed Q&A turns in Redis with an in-memory fallback. The agent is explained in detail in `assignment/agent.md`.
@@ -136,4 +108,4 @@ A vector DB would not help much here because the full schema fits in the system 
 
 ### Conversation Memory
 
-Chat requests include a browser-generated `session_id`. The API stores the last five completed Q&A turns in Redis and injects them as `chat_history`, so users can ask follow-ups like "now filter that by territory 2" without restating the full context.
+Chat requests include a browser-generated `session_id`. The API stores the last five completed Q&A turns in Redis and passes them back to LangChain as alternating `user` and `assistant` messages, so users can ask follow-ups like "now filter that by territory 2" without restating the full context.

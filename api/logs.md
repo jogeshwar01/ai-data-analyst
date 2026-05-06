@@ -486,3 +486,188 @@ The chart visualizes the high volume of prescriptions from these top providers, 
 
 ---
 
+## 2026-05-06 13:47:20
+**Q:** Top 5 HCPs by TRx in the last 90 days
+
+**Trace:**
+→ run_sql({"query": "WITH bounds AS (\n  SELECT MAX(calendar_date) AS hi \n  FROM date_dim \n  WHERE date_id IN (SELECT date_id FR)
+← {"columns": ["hcp_name", "specialty", "tier", "territory_name", "total_trx"], "rows": [["Dr Sage Jackson", "Internal Medicine", "B", "Territory 2", 86], ["Dr Blake Garcia", "Rheumatology", "C", "Terri
+
+**A:** The top 5 HCPs by total TRx over the last 90 days are led by Dr. Sage Jackson (Internal Medicine, Tier B) with 86 TRx. The list is dominated by Rheumatology and Internal Medicine specialists across all three territories, notably including two Tier C providers (Dr. Blake Garcia and Dr. Cameron Clark) who are currently outperforming several Tier A and B targets.
+
+| HCP Name | Specialty | Tier | Territory | Total TRx (Last 90 Days) |
+| :--- | :--- | :--- | :--- | :--- |
+| Dr Sage Jackson | Internal Medicine | B | Territory 2 | 86 |
+| Dr Blake Garcia | Rheumatology | C | Territory 1 | 84 |
+| Dr Cameron Clark | Rheumatology | C | Territory 2 | 83 |
+| Dr Phoenix Lee | Rheumatology | B | Territory 3 | 79 |
+| Dr Hayden Jackson | Internal Medicine | A | Territory 1 | 77 |
+
+---
+
+## 2026-05-06 13:47:32
+**Q:** Show MoM TRx growth per territory
+
+**Trace:**
+→ run_sql({"query": "WITH monthly_trx AS (\n    SELECT \n        territory_name, \n        DATE_TRUNC('month', calendar_date) AS m)
+← {"columns": ["territory_name", "month", "total_trx", "mom_growth_pct"], "rows": [["Territory 1", "2024-08", 527, null], ["Territory 1", "2024-09", 441, -16.32], ["Territory 1", "2024-10", 496, 12.47],
+
+**A:** The Month-over-Month (MoM) TRx growth shows significant volatility across all territories, likely reflecting seasonal prescribing patterns or specific campaign impacts. **Territory 1** experienced the most dramatic swings, notably a 21.66% jump in December 2024 followed by a 23.46% drop in February 2025. **Territory 3** showed the highest single-month growth spike in the dataset, surging 30.39% in September 2025. In contrast, **Territory 2** maintained a more stable growth profile, with most fluctuations staying within a +/- 13% range.
+
+| Territory | Month | Total TRx | MoM Growth % |
+| :--- | :--- | :--- | :--- |
+| Territory 1 | 2025-10 | 569 | +7.36% |
+| Territory 1 | 2025-11 | 464 | -18.45% |
+| Territory 1 | 2025-12 | 513 | +10.56% |
+| Territory 2 | 2025-10 | 544 | -3.89% |
+| Territory 2 | 2025-11 | 537 | -1.29% |
+| Territory 2 | 2025-12 | 593 | +10.43% |
+| Territory 3 | 2025-10 | 558 | -2.96% |
+| Territory 3 | 2025-11 | 515 | -7.71% |
+| Territory 3 | 2025-12 | 544 | +5.63% |
+
+*(Note: Table truncated to the most recent 3 months; full historical data processed in the analysis.)*
+
+---
+
+## 2026-05-06 13:47:52
+**Q:** Does call frequency correlate with TRx?
+
+**Trace:**
+→ run_python({"code": "import pandas as pd\nimport numpy as np\n\n# Query to get total calls and total TRx per HCP\n# We use v_activi)
+← Pearson Correlation Coefficient: 0.1299
+
+Correlation by Tier:
+Tier A: 0.0024
+Tier B: 0.3916
+Tier C: -0.0009
+
+Summary Statistics:
+       call_count   total_trx
+count   90.000000   90.000000
+mean    10.
+→ make_chart({"data_json": "[{\"hcp_id\": 1, \"tier\": \"A\", \"call_count\": 12, \"total_trx\": 310}, {\"hcp_id\": 2, \"tier\": \"B\)
+← {"__type": "chart", "spec": {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "title": "Call Frequency vs. Total TRx by HCP Tier", "width": 400, "height": 300, "data": {"values": [{"hcp_i
+
+**A:** There is a **weak positive correlation** (r = 0.13) between call frequency and total TRx across the full HCP population. However, the relationship varies significantly when segmented by HCP Tier, suggesting that sales activity is not driving volume uniformly across the target list.
+
+### Key Findings:
+*   **Tier B Sensitivity:** Tier B HCPs show the strongest relationship (r = 0.39), indicating that these "mid-tier" targets are currently the most responsive to rep activity. Increasing call frequency in this segment is likely to yield the highest incremental TRx lift.
+*   **Tier A Saturation:** There is virtually no correlation (r = 0.002) for Tier A HCPs. This suggests that high-volume prescribers may have reached a "plateau" where additional calls do not drive further volume, or their prescribing habits are driven by factors other than recent rep interactions (e.g., institutional protocols).
+*   **Tier C Noise:** Tier C HCPs show a flat/slightly negative correlation (r = -0.001). As noted in previous analyses, some Tier C HCPs (like Dr. Blake Garcia) are high-volume "organic" prescribers who are performing well despite lower call frequency.
+
+| Segment | Pearson Correlation (r) | Interpretation |
+| :--- | :--- | :--- |
+| **Overall** | **0.1299** | Weak positive correlation |
+| **Tier A** | 0.0024 | No correlation (Potential saturation) |
+| **Tier B** | 0.3916 | Moderate positive correlation (High responsiveness) |
+| **Tier C** | -0.0009 | No correlation (Organic volume) |
+
+**Recommendation:** Shift incremental call capacity from Tier A to Tier B HCPs, where the data suggests a higher "return on effort" for sales activity.
+
+---
+
+## 2026-05-06 13:56:51
+**Q:** Top 5 HCPs by TRx in the last 90 days
+
+**Trace:**
+→ run_sql({"query": "WITH bounds AS (\n  SELECT MAX(calendar_date) AS hi \n  FROM date_dim \n  WHERE date_id IN (SELECT date_id FR)
+← {"columns": ["hcp_name", "specialty", "tier", "total_trx"], "rows": [["Dr Sage Jackson", "Internal Medicine", "B", 86], ["Dr Blake Garcia", "Rheumatology", "C", 84], ["Dr Cameron Clark", "Rheumatology
+
+**A:** The top 5 HCPs by total TRx over the last 90 days are led by Dr. Sage Jackson (Internal Medicine, Tier B) with 86 TRx. Interestingly, the top list includes two Tier C providers (Dr. Blake Garcia and Dr. Cameron Clark) who are outperforming several Tier A and B peers in recent volume.
+
+| HCP Name | Specialty | Tier | Total TRx (Last 90 Days) |
+| :--- | :--- | :--- | :--- |
+| Dr Sage Jackson | Internal Medicine | B | 86 |
+| Dr Blake Garcia | Rheumatology | C | 84 |
+| Dr Cameron Clark | Rheumatology | C | 83 |
+| Dr Phoenix Lee | Rheumatology | B | 79 |
+| Dr Hayden Jackson | Internal Medicine | A | 77 |
+
+---
+
+## 2026-05-06 13:57:01
+**Q:** what about 120 days
+
+**Trace:**
+→ run_sql({"query": "WITH bounds AS (\n    SELECT MAX(calendar_date) AS hi \n    FROM date_dim \n    WHERE date_id IN (SELECT date)
+← {"columns": ["hcp_name", "specialty", "tier", "total_trx"], "rows": [["Dr Cameron Clark", "Rheumatology", "C", 113], ["Dr Sage Jackson", "Internal Medicine", "B", 108], ["Dr Hayden Jackson", "Internal
+
+**A:** Expanding the window to 120 days shifts the rankings slightly, with **Dr. Cameron Clark** moving into the top spot with 113 TRx. **Dr. Quinn Johnson** also enters the top 5, while Dr. Blake Garcia (who was #2 in the 90-day view) has dropped out of the top 5, suggesting their high volume was more concentrated in the most recent three months.
+
+| HCP Name | Specialty | Tier | Total TRx (Last 120 Days) |
+| :--- | :--- | :--- | :--- |
+| Dr Cameron Clark | Rheumatology | C | 113 |
+| Dr Sage Jackson | Internal Medicine | B | 108 |
+| Dr Hayden Jackson | Internal Medicine | A | 105 |
+| Dr Quinn Johnson | Internal Medicine | B | 101 |
+| Dr Phoenix Lee | Rheumatology | B | 101 |
+
+---
+
+## 2026-05-06 13:57:20
+**Q:** Show MoM TRx growth per territory
+
+**Trace:**
+→ run_sql({"query": "WITH monthly_data AS (\n    SELECT \n        territory_name, \n        DATE_TRUNC('month', calendar_date) AS )
+← {"columns": ["territory_name", "month", "current_month_trx", "mom_growth_pct"], "rows": [["Territory 1", "2024-08", 527, null], ["Territory 1", "2024-09", 441, -16.32], ["Territory 1", "2024-10", 496,
+→ make_chart({"vega_lite_spec": "{\n  \"title\": \"Month-over-Month TRx Growth % by Territory\",\n  \"width\": 600,\n  \"height\": 30)
+← {"__type": "chart", "spec": {"title": "Month-over-Month TRx Growth % by Territory", "width": 600, "height": 300, "mark": {"type": "line", "point": true}, "encoding": {"x": {"field": "month", "type": "
+
+**A:** The Month-over-Month (MoM) TRx growth across the three territories shows significant volatility, with Territory 1 experiencing the most dramatic swings (ranging from -23.5% to +21.7%). Territory 3 showed a notable recovery in September 2025 with a 30.4% growth spike following a sharp decline in August. All three territories ended the year (December 2025) on a positive note, with growth rates between 10.4% and 11.1%.
+
+### Key Growth Trends (2025)
+*   **Territory 1:** Highly cyclical; saw a strong start to the year (+13.8% in Jan) but struggled in February and November.
+*   **Territory 2:** Generally more stable than Territory 1, though it faced a significant dip in April (-13.6%).
+*   **Territory 3:** Maintained relatively steady low-single-digit growth for much of the year, punctuated by a major outlier in September (+30.4%).
+
+(Note: August 2024 is the baseline and does not have a growth percentage.)
+
+---
+
+## 2026-05-06 13:57:29
+**Q:** Does call frequency correlate with TRx?
+
+**Trace:**
+→ run_python({"code": "import pandas as pd\nimport numpy as np\n\n# Get call counts and TRx per HCP\ndf = query(\"\"\"\n    SELECT \n)
+← Correlation coefficient between call frequency and TRx: 0.9438
+
+Average TRx by Call Frequency Tier:
+call_bucket   total_trx
+        Low 1954.000000
+     Medium 2771.684211
+       High 3395.000000
+  Ve
+
+**A:** There is a **very strong positive correlation (r = 0.94)** between call frequency and TRx volume. This suggests that higher engagement from sales representatives is closely aligned with higher prescription volume for GAZYVA.
+
+As shown in the table below, HCPs in the "Very High" call frequency tier average more than double the TRx of those in the "Low" tier.
+
+| Call Frequency Tier | Average Total TRx |
+| :--- | :--- |
+| **Low** | 1,954 |
+| **Medium** | 2,772 |
+| **High** | 3,395 |
+| **Very High** | 4,288 |
+
+**Analyst Note:** While the correlation is high, this doesn't strictly prove causation - reps may be intentionally targeting high-volume "Tier A" doctors more frequently. However, the steady climb across all four buckets indicates that increased touchpoints are a reliable indicator of brand performance at the HCP level.
+
+---
+
+## 2026-05-06 13:57:56
+**Q:** can you create visualisation for this
+
+**Trace:**
+→ run_sql({"query": "SELECT \n    hcp_id, \n    COUNT(*) as call_count, \n    SUM(trx_cnt) as total_trx\nFROM v_activity_enriched )
+← {"columns": ["hcp_id", "call_count", "total_trx"], "rows": [[1000000001, 85, 1870], [1000000002, 204, 3276], [1000000003, 153, 2223], [1000000004, 170, 3170], [1000000005, 221, 3354], [1000000006, 187
+→ make_chart({"data_json": "[{\"hcp_id\":1000000001,\"call_count\":85,\"total_trx\":1870},{\"hcp_id\":1000000002,\"call_count\":204,\)
+← {"__type": "chart", "spec": {"title": "Correlation: Call Frequency vs. Total TRx", "mark": {"type": "point", "filled": true, "size": 100}, "encoding": {"x": {"field": "call_count", "type": "quantitati
+
+**A:** The scatter plot confirms a strong linear relationship between call frequency and TRx volume. Each point represents an individual HCP, and the red regression line illustrates the clear upward trend: as the number of completed calls increases, the total TRx volume typically follows.
+
+### Key Observations:
+*   **Linear Efficiency:** The tight clustering around the regression line indicates that the "return" on calls is relatively consistent across the HCP base.
+*   **High-Volume Clusters:** There is a dense cluster of HCPs receiving between 150 and 250 calls, where TRx volume ranges significantly from ~2,500 to ~5,000, suggesting that while calls are important, other factors (like HCP tier or specialty) also influence the final volume.
+*   **Outliers:** A few HCPs (top right) have received nearly 300 calls and are delivering the highest volume (over 5,000 TRx), representing the most intensive and successful engagement efforts.
+
+---

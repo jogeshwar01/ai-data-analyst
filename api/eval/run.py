@@ -14,7 +14,8 @@ from langchain_openai import ChatOpenAI
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import db
-from agent import get_executor
+from agent import get_agent
+from agent.core import extract_final_answer, extract_intermediate_steps
 
 GOLDEN_FILE = Path(__file__).parent / "golden.json"
 QUICK_FILE = Path(__file__).parent / "quick.json"
@@ -81,14 +82,13 @@ def grade_llm_judge(answer: str, rubric: str) -> tuple[bool, str]:
 
 
 def run_agent(question: str) -> tuple[str, float, list]:
-    executor = get_executor()
+    agent = get_agent()
     t0 = time.time()
-    result = executor.invoke(
-        {"input": question, "chat_history": "No prior questions in this eval run."}
-    )
+    result = agent.invoke({"messages": [{"role": "user", "content": question}]})
     elapsed = round(time.time() - t0, 1)
-    steps = result.get("intermediate_steps", [])
-    return result.get("output", ""), elapsed, steps
+    messages = result.get("messages", [])
+    steps = extract_intermediate_steps(messages)
+    return extract_final_answer(messages), elapsed, steps
 
 
 def _preview(value: Any, limit: int = 200) -> str:

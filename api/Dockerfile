@@ -12,8 +12,8 @@ RUN pip install --no-cache-dir \
     uvicorn[standard]==0.32.1 \
     psycopg[binary,pool]==3.2.3 \
     redis==5.2.0 \
-    langchain==0.3.10 \
-    langchain-openai==0.2.11 \
+    "langchain>=1.0,<2" \
+    "langchain-openai>=1.0,<2" \
     pydantic==2.10.3 \
     pandas==2.2.3 \
     numpy==2.1.3

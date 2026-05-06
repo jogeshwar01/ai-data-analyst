@@ -53,21 +53,17 @@ def save_chat_turn(session_id: Optional[str], question: str, answer: str) -> Non
         del turns[:-HISTORY_TURNS]
 
 
-def format_chat_history(turns: List[Dict[str, str]]) -> str:
-    if not turns:
-        return "No prior questions in this session."
-
-    lines = [
-        "Last completed turns in this session. Use them only to resolve follow-up references; answer the current question directly."
-    ]
-    for idx, turn in enumerate(turns, 1):
+def build_messages(turns: List[Dict[str, str]], current_question: str) -> List[Dict[str, str]]:
+    messages: List[Dict[str, str]] = []
+    for turn in turns:
         question = turn.get("question", "").strip()
         answer = turn.get("answer", "").strip()
-        if not question and not answer:
-            continue
-        lines.append(f"{idx}. User: {question}")
-        lines.append(f"   Assistant: {answer}")
-    return "\n".join(lines)
+        if question:
+            messages.append({"role": "user", "content": question})
+        if answer:
+            messages.append({"role": "assistant", "content": answer})
+    messages.append({"role": "user", "content": current_question})
+    return messages
 
 
 def _redis_client() -> redis.Redis:
